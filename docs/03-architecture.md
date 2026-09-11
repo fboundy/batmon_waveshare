@@ -18,6 +18,8 @@ src/
 └── ui/
     └── ui.*                 the four LVGL pages
 include/lv_conf.h            LVGL configuration (16-bit colour, Montserrat 14–48)
+src/ui/font_montserrat_72_digits.c   generated 72 px digits for the SoC (tools/gen_font.py)
+tools/gen_font.py            Pillow-based LVGL font generator (no node/lv_font_conv needed)
 test/test_protocol/          Unity tests for batmon_protocol (host, `pio test -e native`)
 ```
 
@@ -102,12 +104,15 @@ inside the visible circle of the round panel (roughly a 440 px diameter).
 
 | Tile | Contents |
 |---|---|
-| Halo | 270° SoC arc coloured green/amber/red; SoC % with the unit on a shared baseline; **Main** and **Aux** voltages side by side; current with charge/discharge arrow (blue = charging, amber = discharging); power; external temperature; time-to-empty/full; **Switch** output toggle; red **charge-mismatch alert** (aux > 13.0 V while main current < 0.2 A); link status dot |
+| Halo | 270° SoC arc coloured green/amber/red; 72 px SoC digits with a 32 px unit on a shared baseline; **Main** and **Aux** voltages (40 px, 28 px units) side by side; current with charge/discharge arrow (blue = charging, amber = discharging); power; external temperature; time-to-empty/full; large **Switch** output toggle; red **charge-mismatch alert** (aux > 13.0 V while main current < 0.2 A); Bluetooth glyph in the arc's gap, green when connected with fresh data, red otherwise |
 | Details | every raw reading, RSSI, poll counters, MAC; **Relay** and **Switch** toggles |
 | Chart | line chart of Main V / Aux V / SoC / Amps (toggle buttons), **Hour / Day / Week / Month** range buttons and ◀ ▶ to scroll one range at a time. Left axis is volts (auto-ranged); right axis is SoC % when SoC is shown, otherwise amps (auto-ranged). When both SoC and amps are on, amps are scaled onto the SoC axis and the scale is printed under the chart |
 | Setup | capacity ±1/±10 Ah, brightness slider, °C/°F, **Pause BLE 5 min / Resume**, **Forget device**, firmware version |
 
 Readings older than 10 s are drawn grey so a frozen link is obvious.
+Baseline alignment between different font sizes in one row is done by
+translating the smaller label up by the difference of the fonts'
+`base_line` values (see `buildHalo()`).
 Switch/relay widgets are not re-synced from device state for 3 s after a
 user tap so they don't snap back before the BLE command completes. Chart
 series and range selections persist in NVS.

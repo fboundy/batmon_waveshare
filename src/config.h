@@ -9,7 +9,7 @@
 // Firmware identity
 // ---------------------------------------------------------------------------
 #define FW_NAME     "batmon-display"
-#define FW_VERSION  "0.2.0"
+#define FW_VERSION  "0.2.1"
 
 // ---------------------------------------------------------------------------
 // I2C bus (shared: TCA9554 IO expander, CST820 touch, QMI8658 IMU, PCF85063 RTC)

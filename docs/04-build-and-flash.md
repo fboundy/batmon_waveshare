@@ -51,6 +51,22 @@ This needs a native C/C++ compiler on the PATH (GCC/Clang/MinGW). Without one
 you can still validate the byte layout with the HA Python classes — the same
 vectors are exercised in `docs/02-ble-protocol.md`.
 
+## Fonts
+
+LVGL's built-in Montserrat stops at 48 px. Larger glyphs are generated from
+the TTF that ships inside the LVGL library with `tools/gen_font.py`
+(needs only Pillow — `lv_font_conv` needs node, which this project avoids):
+
+```sh
+python tools/gen_font.py   --ttf .pio/libdeps/waveshare_s3_lcd_2_1/lvgl/scripts/built_in_font/Montserrat-Medium.ttf   --size 72 --chars "0123456789-" --name lv_font_montserrat_72_digits   -o src/ui/font_montserrat_72_digits.c
+```
+
+It emits the `lv_font_fmt_txt` format at 4 bpp (bit stream continuous
+across rows, byte-padded per glyph; `ofs_y` measured from the baseline) with
+`line_height = 1.125 x size` and `base_line = 0.21 x size` to match the
+built-in Montserrat metrics. Only the listed characters exist in the font,
+so use it for labels that only ever show those.
+
 ## Configuration
 
 All tunables are in `src/config.h`:

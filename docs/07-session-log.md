@@ -101,6 +101,15 @@ continue on another machine. Newest entries at the bottom.
 - Note: if the board is boot-looping, the first `pio run -t upload` can
   lose the COM port mid-reset; just run it again.
 
+### Halo page polish (v0.2.1)
+- SoC digits 72 px (custom generated font, digits + hyphen only) with the
+  32 px `%` on the baseline; voltages 40 px with 28 px `V` units; big
+  100x48 switch; link state is now a Bluetooth glyph (green connected /
+  red otherwise) in the arc's bottom gap instead of a dot + text.
+- `tools/gen_font.py` written because there is no node for lv_font_conv.
+  Pillow's `getbbox()` is not a tight ink box - measure the rendered glyph.
+- Flashed and booting; not yet seen against the BatMon.
+
 ### Not yet done
 - History is RAM-only and relative-time; TF-card persistence and RTC
   timestamps are on the roadmap.

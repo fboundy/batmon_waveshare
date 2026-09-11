@@ -14,6 +14,8 @@
 using batmon::LinkState;
 using batmon::State;
 
+LV_FONT_DECLARE(lv_font_montserrat_72_digits)   // src/ui/font_montserrat_72_digits.c
+
 namespace ui {
 
 // ---------------------------------------------------------------------------
@@ -59,14 +61,15 @@ static lv_obj_t* lblSoc;
 static lv_obj_t* lblSocUnit;
 static lv_obj_t* lblMainV;
 static lv_obj_t* lblAuxV;
+static lv_obj_t* lblMainUnit;
+static lv_obj_t* lblAuxUnit;
 static lv_obj_t* lblAmps;
 static lv_obj_t* lblWatts;
 static lv_obj_t* lblTemp;
 static lv_obj_t* lblRuntime;
 static lv_obj_t* swHaloSwitch;
 static lv_obj_t* lblAlert;
-static lv_obj_t* lblLink;
-static lv_obj_t* dotLink;
+static lv_obj_t* lblBt;      // Bluetooth icon, green = connected, red = not
 
 // Detail page
 enum DetailRow {
@@ -195,71 +198,73 @@ static void buildHalo(lv_obj_t* page) {
     lv_obj_align(lblName, LV_ALIGN_TOP_MID, 0, 62);
     lv_label_set_text(lblName, "BatMon");
 
-    // SoC: digits + unit on a shared baseline
-    lv_obj_t* rowSoc = mkRow(page, 4);
-    lv_obj_align(rowSoc, LV_ALIGN_CENTER, 0, -100);
-    lblSoc = mkLabel(rowSoc, &lv_font_montserrat_48, C_TEXT);
+    // Vertical layout (centre-relative): SoC -108, volts -36, A/W +14,
+    // temp +50, runtime +78, switch +124, alert +166, Bluetooth +196.
+    // Everything stays inside the visible circle and the arc's bottom gap.
+
+    // SoC: 72 px digits + 32 px unit on a shared baseline
+    lv_obj_t* rowSoc = mkRow(page, 6);
+    lv_obj_align(rowSoc, LV_ALIGN_CENTER, 0, -108);
+    lblSoc = mkLabel(rowSoc, &lv_font_montserrat_72_digits, C_TEXT);
     lblSocUnit = mkLabel(rowSoc, &lv_font_montserrat_32, C_DIM);
     lv_label_set_text(lblSocUnit, "%");
-    // Montserrat 48 sits 10 px below its baseline, 32 sits 7 px: lift by 3.
-    lv_obj_set_style_translate_y(lblSocUnit, -3, 0);
+    // baseline correction = big font base_line - small font base_line
+    lv_obj_set_style_translate_y(lblSocUnit, -(15 - 6), 0);
 
-    // Voltages: "Main 13.19 V   Aux 12.62 V"
-    lv_obj_t* rowV = mkRow(page, 6);
-    lv_obj_align(rowV, LV_ALIGN_CENTER, 0, -38);
+    // Voltages: "Main 13.19 V   Aux 12.62 V" (40 px values, 28 px units)
+    lv_obj_t* rowV = mkRow(page, 5);
+    lv_obj_align(rowV, LV_ALIGN_CENTER, 0, -36);
     lv_obj_t* capMain = mkLabel(rowV, &lv_font_montserrat_14, C_DIM);
     lv_label_set_text(capMain, "Main");
-    lv_obj_set_style_translate_y(capMain, -3, 0);
-    lblMainV = mkLabel(rowV, &lv_font_montserrat_28, C_TEXT);
+    lv_obj_set_style_translate_y(capMain, -(8 - 3), 0);
+    lblMainV = mkLabel(rowV, &lv_font_montserrat_40, C_TEXT);
+    lblMainUnit = mkLabel(rowV, &lv_font_montserrat_28, C_DIM);
+    lv_label_set_text(lblMainUnit, "V");
+    lv_obj_set_style_translate_y(lblMainUnit, -(8 - 5), 0);
     lv_obj_t* spacer = lv_obj_create(rowV);
     lv_obj_remove_style_all(spacer);
-    lv_obj_set_size(spacer, 18, 1);
+    lv_obj_set_size(spacer, 14, 1);
     lv_obj_t* capAux = mkLabel(rowV, &lv_font_montserrat_14, C_DIM);
     lv_label_set_text(capAux, "Aux");
-    lv_obj_set_style_translate_y(capAux, -3, 0);
-    lblAuxV = mkLabel(rowV, &lv_font_montserrat_28, C_TEXT);
+    lv_obj_set_style_translate_y(capAux, -(8 - 3), 0);
+    lblAuxV = mkLabel(rowV, &lv_font_montserrat_40, C_TEXT);
+    lblAuxUnit = mkLabel(rowV, &lv_font_montserrat_28, C_DIM);
+    lv_label_set_text(lblAuxUnit, "V");
+    lv_obj_set_style_translate_y(lblAuxUnit, -(8 - 5), 0);
 
     lblAmps = mkLabel(page, &lv_font_montserrat_28, C_TEXT);
-    lv_obj_align(lblAmps, LV_ALIGN_CENTER, -70, 10);
+    lv_obj_align(lblAmps, LV_ALIGN_CENTER, -72, 14);
     lblWatts = mkLabel(page, &lv_font_montserrat_28, C_TEXT);
-    lv_obj_align(lblWatts, LV_ALIGN_CENTER, 70, 10);
+    lv_obj_align(lblWatts, LV_ALIGN_CENTER, 72, 14);
 
     lblTemp = mkLabel(page, &lv_font_montserrat_20, C_DIM);
     lv_obj_align(lblTemp, LV_ALIGN_CENTER, 0, 50);
 
     lblRuntime = mkLabel(page, &lv_font_montserrat_18, C_DIM);
-    lv_obj_align(lblRuntime, LV_ALIGN_CENTER, 0, 80);
+    lv_obj_align(lblRuntime, LV_ALIGN_CENTER, 0, 78);
     lv_label_set_text(lblRuntime, "");
 
-    // Switch output control
-    lv_obj_t* rowSw = mkRow(page, 10);
+    // Switch output control - big enough to hit with a thumb
+    lv_obj_t* rowSw = mkRow(page, 14);
     lv_obj_set_flex_align(rowSw, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_align(rowSw, LV_ALIGN_CENTER, 0, 114);
-    lv_obj_t* capSw = mkLabel(rowSw, &lv_font_montserrat_16, C_DIM);
+    lv_obj_align(rowSw, LV_ALIGN_CENTER, 0, 124);
+    lv_obj_t* capSw = mkLabel(rowSw, &lv_font_montserrat_20, C_DIM);
     lv_label_set_text(capSw, "Switch");
     swHaloSwitch = lv_switch_create(rowSw);
-    lv_obj_set_size(swHaloSwitch, 52, 26);
+    lv_obj_set_size(swHaloSwitch, 100, 48);
     lv_obj_set_style_bg_color(swHaloSwitch, C_ACCENT, LV_PART_INDICATOR | LV_STATE_CHECKED);
     lv_obj_add_event_cb(swHaloSwitch, onSwitchSwitch, LV_EVENT_VALUE_CHANGED, nullptr);
 
     // Alert line (hidden unless active)
     lblAlert = mkLabel(page, &lv_font_montserrat_18, C_BAD);
-    lv_obj_align(lblAlert, LV_ALIGN_CENTER, 0, 150);
+    lv_obj_align(lblAlert, LV_ALIGN_CENTER, 0, 166);
     lv_label_set_text(lblAlert, "");
     lv_obj_add_flag(lblAlert, LV_OBJ_FLAG_HIDDEN);
 
-    // Link status
-    dotLink = lv_obj_create(page);
-    lv_obj_set_size(dotLink, 12, 12);
-    lv_obj_set_style_radius(dotLink, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_border_width(dotLink, 0, 0);
-    lv_obj_set_style_bg_color(dotLink, C_DIM, 0);
-    lv_obj_align(dotLink, LV_ALIGN_BOTTOM_MID, -46, -50);
-    lv_obj_clear_flag(dotLink, LV_OBJ_FLAG_SCROLLABLE);
-
-    lblLink = mkLabel(page, &lv_font_montserrat_16, C_DIM);
-    lv_obj_align(lblLink, LV_ALIGN_BOTTOM_MID, 12, -48);
-    lv_label_set_text(lblLink, "Starting");
+    // Link status: Bluetooth glyph in the arc's bottom gap
+    lblBt = mkLabel(page, &lv_font_montserrat_28, C_BAD);
+    lv_label_set_text(lblBt, LV_SYMBOL_BLUETOOTH);
+    lv_obj_align(lblBt, LV_ALIGN_CENTER, 0, 196);
 }
 
 // ---------------------------------------------------------------------------
@@ -673,13 +678,13 @@ void update(const State& s) {
     }
     lv_obj_set_style_text_color(lblSoc, txt, 0);
 
-    if (s.volts.valid()) snprintf(buf, sizeof buf, "%.2f V", s.volts.value);
-    else snprintf(buf, sizeof buf, "-- V");
+    if (s.volts.valid()) snprintf(buf, sizeof buf, "%.2f", s.volts.value);
+    else snprintf(buf, sizeof buf, "--");
     lv_label_set_text(lblMainV, buf);
     lv_obj_set_style_text_color(lblMainV, txt, 0);
 
-    if (s.extVolts.valid()) snprintf(buf, sizeof buf, "%.2f V", s.extVolts.value);
-    else snprintf(buf, sizeof buf, "-- V");
+    if (s.extVolts.valid()) snprintf(buf, sizeof buf, "%.2f", s.extVolts.value);
+    else snprintf(buf, sizeof buf, "--");
     lv_label_set_text(lblAuxV, buf);
     lv_obj_set_style_text_color(lblAuxV, stale(s.extVolts) ? C_STALE : C_TEXT, 0);
 
@@ -722,25 +727,9 @@ void update(const State& s) {
         lv_obj_add_flag(lblAlert, LV_OBJ_FLAG_HIDDEN);
     }
 
-    // Link status
-    lv_color_t dot = C_DIM;
-    const char* linkTxt = batmon::linkStateName(s.link);
-    switch (s.link) {
-        case LinkState::Connected:    dot = vStale ? C_WARN : C_GOOD; break;
-        case LinkState::Scanning:
-        case LinkState::Connecting:
-        case LinkState::Reconnecting: dot = C_WARN; break;
-        case LinkState::Paused:       dot = C_CHARGE; break;
-        default: break;
-    }
-    if (s.link == LinkState::Paused) {
-        int32_t left = (int32_t)(s.pauseUntilMs - millis());
-        if (left < 0) left = 0;
-        snprintf(buf, sizeof buf, "Paused %d:%02d", left / 60000, (left / 1000) % 60);
-        linkTxt = buf;
-    }
-    lv_obj_set_style_bg_color(dotLink, dot, 0);
-    lv_label_set_text(lblLink, linkTxt);
+    // Link status: green only when connected with fresh data, else red
+    bool linked = s.link == LinkState::Connected && !vStale;
+    lv_obj_set_style_text_color(lblBt, linked ? C_GOOD : C_BAD, 0);
 
     // ---- Detail page ----
     auto fmt = [&](DetailRow r, const batmon::Reading& rd, const char* f, float scale = 1.0f) {
