@@ -37,7 +37,7 @@ remembered; use *Forget device* to change it.
 
 ## Documentation
 
-Everything is in [`docs/`](docs/README.md):
+Everything is in [`docs/`](docs/README.md) — start with [docs/07-session-log.md](docs/07-session-log.md) for current status;
 hardware, protocol, architecture, build/flash, Halo feature parity, roadmap.
 
 ## Layout

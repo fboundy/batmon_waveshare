@@ -8,6 +8,7 @@
 | [04-build-and-flash.md](04-build-and-flash.md) | PlatformIO build, flashing, host tests, serial log |
 | [05-halo-parity.md](05-halo-parity.md) | Feature-by-feature comparison with the BatMon Halo and what's extra |
 | [06-roadmap.md](06-roadmap.md) | Open questions that need a real BatMon, planned features |
+| [07-session-log.md](07-session-log.md) | What has been done, decided and verified so far; next steps (read this first when picking the project up) |
 
 ## Sources
 
