@@ -3,10 +3,12 @@
 #include <Arduino.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "../batmon/batmon_client.h"
 #include "../board/display.h"
 #include "../config.h"
+#include "../history.h"
 #include "../settings.h"
 
 using batmon::LinkState;
@@ -22,11 +24,19 @@ static const lv_color_t C_TEXT     = lv_color_hex(0xF2F2F2);
 static const lv_color_t C_DIM      = lv_color_hex(0x8A8A8A);
 static const lv_color_t C_STALE    = lv_color_hex(0x555555);
 static const lv_color_t C_TRACK    = lv_color_hex(0x202020);
+static const lv_color_t C_GRID     = lv_color_hex(0x2A2A2A);
 static const lv_color_t C_GOOD     = lv_color_hex(0x2ECC71);
 static const lv_color_t C_WARN     = lv_color_hex(0xF1C40F);
 static const lv_color_t C_BAD      = lv_color_hex(0xE74C3C);
 static const lv_color_t C_CHARGE   = lv_color_hex(0x3498DB);
 static const lv_color_t C_ACCENT   = lv_color_hex(0x00BFA5);
+static const lv_color_t C_BTN      = lv_color_hex(0x2A2A2A);
+
+// Chart series colours
+static const lv_color_t C_SER_MAIN = lv_color_hex(0x2ECC71);
+static const lv_color_t C_SER_AUX  = lv_color_hex(0x00BFA5);
+static const lv_color_t C_SER_SOC  = lv_color_hex(0xF2F2F2);
+static const lv_color_t C_SER_AMPS = lv_color_hex(0x3498DB);
 
 static lv_color_t socColor(float soc) {
     if (soc < 0)  return C_DIM;
@@ -40,17 +50,21 @@ static lv_color_t socColor(float soc) {
 // ---------------------------------------------------------------------------
 static board::Display* g_disp = nullptr;
 static lv_obj_t* tv = nullptr;
+static lv_obj_t* pChart = nullptr;
 
 // Halo page
 static lv_obj_t* arc;
 static lv_obj_t* lblName;
 static lv_obj_t* lblSoc;
 static lv_obj_t* lblSocUnit;
-static lv_obj_t* lblVolts;
+static lv_obj_t* lblMainV;
+static lv_obj_t* lblAuxV;
 static lv_obj_t* lblAmps;
 static lv_obj_t* lblWatts;
 static lv_obj_t* lblTemp;
 static lv_obj_t* lblRuntime;
+static lv_obj_t* swHaloSwitch;
+static lv_obj_t* lblAlert;
 static lv_obj_t* lblLink;
 static lv_obj_t* dotLink;
 
@@ -63,6 +77,27 @@ static lv_obj_t* detVal[D_COUNT];
 static lv_obj_t* swRelay;
 static lv_obj_t* swSwitch;
 static bool suppressSwitchEvents = false;
+// After a user toggle, stop syncing the switches from device state for a
+// moment so they don't snap back before the BLE command has gone through.
+static uint32_t switchHoldUntilMs = 0;
+static constexpr uint32_t SWITCH_HOLD_MS = 3000;
+
+// Chart page
+static lv_obj_t* chart;
+static lv_chart_series_t* serMain;
+static lv_chart_series_t* serAux;
+static lv_chart_series_t* serSoc;
+static lv_chart_series_t* serAmps;
+static lv_obj_t* btnSeries[4];
+static lv_obj_t* btnRange[4];
+static lv_obj_t* lblWindow;
+static lv_obj_t* lblScale;
+static int  chartOffset = 0;
+static bool secIsAmps = false;      // right axis shows amps (SoC hidden)
+static float ampMin = -1, ampMax = 1;
+static uint32_t lastChartMs = 0;
+static bool chartVisible = false;
+static history::Sample chartPts[history::POINTS];   // static: too big for the loop stack
 
 // Setup page
 static lv_obj_t* lblCapacity;
@@ -90,6 +125,35 @@ static lv_obj_t* mkLabel(lv_obj_t* parent, const lv_font_t* font, lv_color_t col
     return l;
 }
 
+// Transparent flex row whose children sit on a common bottom edge.
+// Used to keep a unit / caption glued to a value whose width changes.
+static lv_obj_t* mkRow(lv_obj_t* parent, lv_coord_t gap) {
+    lv_obj_t* row = lv_obj_create(parent);
+    lv_obj_remove_style_all(row);
+    lv_obj_set_size(row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(row, gap, 0);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    return row;
+}
+
+static lv_obj_t* mkButton(lv_obj_t* parent, const char* text, int w, int h,
+                          lv_event_cb_t cb, void* ud, const lv_font_t* font = &lv_font_montserrat_16) {
+    lv_obj_t* b = lv_btn_create(parent);
+    lv_obj_set_size(b, w, h);
+    lv_obj_set_style_bg_color(b, C_BTN, 0);
+    lv_obj_set_style_bg_color(b, C_ACCENT, LV_STATE_PRESSED);
+    lv_obj_set_style_shadow_width(b, 0, 0);
+    lv_obj_set_style_pad_all(b, 0, 0);
+    if (cb) lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, ud);
+    lv_obj_t* l = lv_label_create(b);
+    lv_obj_set_style_text_font(l, font, 0);
+    lv_label_set_text(l, text);
+    lv_obj_center(l);
+    return b;
+}
+
 static void setCapacityLabel() {
     char buf[32];
     if (g_settings.capacityAh > 0)
@@ -97,6 +161,13 @@ static void setCapacityLabel() {
     else
         snprintf(buf, sizeof buf, "not set");
     lv_label_set_text(lblCapacity, buf);
+}
+
+static void onSwitchSwitch(lv_event_t* e) {
+    if (suppressSwitchEvents) return;
+    bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+    switchHoldUntilMs = millis() + SWITCH_HOLD_MS;
+    batmon::g_client.requestSetIo(batmon::IoType::Switch, on);
 }
 
 // ---------------------------------------------------------------------------
@@ -124,37 +195,70 @@ static void buildHalo(lv_obj_t* page) {
     lv_obj_align(lblName, LV_ALIGN_TOP_MID, 0, 62);
     lv_label_set_text(lblName, "BatMon");
 
-    lblSoc = mkLabel(page, &lv_font_montserrat_48, C_TEXT);
-    lv_obj_align(lblSoc, LV_ALIGN_CENTER, -8, -58);
-    lblSocUnit = mkLabel(page, &lv_font_montserrat_24, C_DIM);
-    lv_obj_align_to(lblSocUnit, lblSoc, LV_ALIGN_OUT_RIGHT_BOTTOM, 4, -6);
+    // SoC: digits + unit on a shared baseline
+    lv_obj_t* rowSoc = mkRow(page, 4);
+    lv_obj_align(rowSoc, LV_ALIGN_CENTER, 0, -100);
+    lblSoc = mkLabel(rowSoc, &lv_font_montserrat_48, C_TEXT);
+    lblSocUnit = mkLabel(rowSoc, &lv_font_montserrat_32, C_DIM);
     lv_label_set_text(lblSocUnit, "%");
+    // Montserrat 48 sits 10 px below its baseline, 32 sits 7 px: lift by 3.
+    lv_obj_set_style_translate_y(lblSocUnit, -3, 0);
 
-    lblVolts = mkLabel(page, &lv_font_montserrat_32, C_TEXT);
-    lv_obj_align(lblVolts, LV_ALIGN_CENTER, 0, 0);
+    // Voltages: "Main 13.19 V   Aux 12.62 V"
+    lv_obj_t* rowV = mkRow(page, 6);
+    lv_obj_align(rowV, LV_ALIGN_CENTER, 0, -38);
+    lv_obj_t* capMain = mkLabel(rowV, &lv_font_montserrat_14, C_DIM);
+    lv_label_set_text(capMain, "Main");
+    lv_obj_set_style_translate_y(capMain, -3, 0);
+    lblMainV = mkLabel(rowV, &lv_font_montserrat_28, C_TEXT);
+    lv_obj_t* spacer = lv_obj_create(rowV);
+    lv_obj_remove_style_all(spacer);
+    lv_obj_set_size(spacer, 18, 1);
+    lv_obj_t* capAux = mkLabel(rowV, &lv_font_montserrat_14, C_DIM);
+    lv_label_set_text(capAux, "Aux");
+    lv_obj_set_style_translate_y(capAux, -3, 0);
+    lblAuxV = mkLabel(rowV, &lv_font_montserrat_28, C_TEXT);
 
     lblAmps = mkLabel(page, &lv_font_montserrat_28, C_TEXT);
-    lv_obj_align(lblAmps, LV_ALIGN_CENTER, -70, 48);
+    lv_obj_align(lblAmps, LV_ALIGN_CENTER, -70, 10);
     lblWatts = mkLabel(page, &lv_font_montserrat_28, C_TEXT);
-    lv_obj_align(lblWatts, LV_ALIGN_CENTER, 70, 48);
+    lv_obj_align(lblWatts, LV_ALIGN_CENTER, 70, 10);
 
     lblTemp = mkLabel(page, &lv_font_montserrat_20, C_DIM);
-    lv_obj_align(lblTemp, LV_ALIGN_CENTER, 0, 96);
+    lv_obj_align(lblTemp, LV_ALIGN_CENTER, 0, 50);
 
     lblRuntime = mkLabel(page, &lv_font_montserrat_18, C_DIM);
-    lv_obj_align(lblRuntime, LV_ALIGN_CENTER, 0, 128);
+    lv_obj_align(lblRuntime, LV_ALIGN_CENTER, 0, 80);
     lv_label_set_text(lblRuntime, "");
 
+    // Switch output control
+    lv_obj_t* rowSw = mkRow(page, 10);
+    lv_obj_set_flex_align(rowSw, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_align(rowSw, LV_ALIGN_CENTER, 0, 114);
+    lv_obj_t* capSw = mkLabel(rowSw, &lv_font_montserrat_16, C_DIM);
+    lv_label_set_text(capSw, "Switch");
+    swHaloSwitch = lv_switch_create(rowSw);
+    lv_obj_set_size(swHaloSwitch, 52, 26);
+    lv_obj_set_style_bg_color(swHaloSwitch, C_ACCENT, LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_add_event_cb(swHaloSwitch, onSwitchSwitch, LV_EVENT_VALUE_CHANGED, nullptr);
+
+    // Alert line (hidden unless active)
+    lblAlert = mkLabel(page, &lv_font_montserrat_18, C_BAD);
+    lv_obj_align(lblAlert, LV_ALIGN_CENTER, 0, 150);
+    lv_label_set_text(lblAlert, "");
+    lv_obj_add_flag(lblAlert, LV_OBJ_FLAG_HIDDEN);
+
+    // Link status
     dotLink = lv_obj_create(page);
     lv_obj_set_size(dotLink, 12, 12);
     lv_obj_set_style_radius(dotLink, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_border_width(dotLink, 0, 0);
     lv_obj_set_style_bg_color(dotLink, C_DIM, 0);
-    lv_obj_align(dotLink, LV_ALIGN_BOTTOM_MID, -46, -70);
+    lv_obj_align(dotLink, LV_ALIGN_BOTTOM_MID, -46, -50);
     lv_obj_clear_flag(dotLink, LV_OBJ_FLAG_SCROLLABLE);
 
     lblLink = mkLabel(page, &lv_font_montserrat_16, C_DIM);
-    lv_obj_align(lblLink, LV_ALIGN_BOTTOM_MID, 12, -68);
+    lv_obj_align(lblLink, LV_ALIGN_BOTTOM_MID, 12, -48);
     lv_label_set_text(lblLink, "Starting");
 }
 
@@ -164,17 +268,13 @@ static void buildHalo(lv_obj_t* page) {
 static void onSwitchRelay(lv_event_t* e) {
     if (suppressSwitchEvents) return;
     bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+    switchHoldUntilMs = millis() + SWITCH_HOLD_MS;
     batmon::g_client.requestSetIo(batmon::IoType::Relay, on);
-}
-static void onSwitchSwitch(lv_event_t* e) {
-    if (suppressSwitchEvents) return;
-    bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
-    batmon::g_client.requestSetIo(batmon::IoType::Switch, on);
 }
 
 static void buildDetail(lv_obj_t* page) {
     static const char* names[D_COUNT] = {
-        "Voltage", "Ext voltage", "Current", "Power", "Amp hours", "Ah full ref",
+        "Main voltage", "Aux voltage", "Current", "Power", "Amp hours", "Ah full ref",
         "Ah min", "Ext temp", "CPU temp", "RSSI", "Polls ok/err", "Address"};
 
     lv_obj_t* title = mkLabel(page, &lv_font_montserrat_20, C_ACCENT);
@@ -210,7 +310,223 @@ static void buildDetail(lv_obj_t* page) {
 }
 
 // ---------------------------------------------------------------------------
-// Page 2: Setup
+// Page 2: Chart
+// ---------------------------------------------------------------------------
+static history::Range chartRange() {
+    uint8_t r = g_settings.chartRange;
+    if (r > 3) r = 0;
+    return (history::Range)r;
+}
+
+static void setWindowLabel() {
+    static const char* unit[4] = {"h", "d", "w", "mo"};
+    static const char* whole[4] = {"last hour", "last 24 h", "last 7 days", "last 30 days"};
+    int r = (int)chartRange();
+    char buf[40];
+    if (chartOffset == 0) snprintf(buf, sizeof buf, "%s", whole[r]);
+    else snprintf(buf, sizeof buf, "-%d%s to -%d%s", chartOffset + 1, unit[r], chartOffset, unit[r]);
+    lv_label_set_text(lblWindow, buf);
+}
+
+static void rebuildChart() {
+    lastChartMs = millis();
+    history::window(chartRange(), chartOffset, chartPts);
+    uint8_t mask = g_settings.chartMask;
+
+    // --- volt axis (left) from the visible voltage series ---
+    float vmin = 1e9f, vmax = -1e9f;
+    for (int i = 0; i < history::POINTS; i++) {
+        const history::Sample& s = chartPts[i];
+        if ((mask & 1) && !isnan(s.mainV)) { vmin = fminf(vmin, s.mainV); vmax = fmaxf(vmax, s.mainV); }
+        if ((mask & 2) && !isnan(s.auxV))  { vmin = fminf(vmin, s.auxV);  vmax = fmaxf(vmax, s.auxV); }
+    }
+    if (vmin > vmax) { vmin = 10.0f; vmax = 15.0f; }
+    vmin = floorf((vmin - 0.15f) * 2.0f) / 2.0f;
+    vmax = ceilf((vmax + 0.15f) * 2.0f) / 2.0f;
+    if (vmax - vmin < 1.0f) vmax = vmin + 1.0f;
+    lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, (lv_coord_t)lroundf(vmin * 100), (lv_coord_t)lroundf(vmax * 100));
+
+    // --- amps: auto range, mapped onto the 0..100 right axis ---
+    float amin = 1e9f, amax = -1e9f;
+    for (int i = 0; i < history::POINTS; i++) {
+        const history::Sample& s = chartPts[i];
+        if (!isnan(s.current)) { amin = fminf(amin, s.current); amax = fmaxf(amax, s.current); }
+    }
+    if (amin > amax) { amin = -1; amax = 1; }
+    amin = floorf(amin - 0.2f);
+    amax = ceilf(amax + 0.2f);
+    if (amax - amin < 2.0f) amax = amin + 2.0f;
+    ampMin = amin;
+    ampMax = amax;
+    secIsAmps = !(mask & 4) && (mask & 8);
+    lv_chart_set_range(chart, LV_CHART_AXIS_SECONDARY_Y, 0, 100);
+
+    lv_coord_t* aMain = lv_chart_get_y_array(chart, serMain);
+    lv_coord_t* aAux  = lv_chart_get_y_array(chart, serAux);
+    lv_coord_t* aSoc  = lv_chart_get_y_array(chart, serSoc);
+    lv_coord_t* aAmp  = lv_chart_get_y_array(chart, serAmps);
+    for (int i = 0; i < history::POINTS; i++) {
+        const history::Sample& s = chartPts[i];
+        aMain[i] = isnan(s.mainV)   ? LV_CHART_POINT_NONE : (lv_coord_t)lroundf(s.mainV * 100);
+        aAux[i]  = isnan(s.auxV)    ? LV_CHART_POINT_NONE : (lv_coord_t)lroundf(s.auxV * 100);
+        aSoc[i]  = isnan(s.soc)     ? LV_CHART_POINT_NONE : (lv_coord_t)lroundf(s.soc);
+        aAmp[i]  = isnan(s.current) ? LV_CHART_POINT_NONE
+                                    : (lv_coord_t)lroundf((s.current - amin) / (amax - amin) * 100.0f);
+    }
+    lv_chart_hide_series(chart, serMain, !(mask & 1));
+    lv_chart_hide_series(chart, serAux,  !(mask & 2));
+    lv_chart_hide_series(chart, serSoc,  !(mask & 4));
+    lv_chart_hide_series(chart, serAmps, !(mask & 8));
+    lv_chart_refresh(chart);
+
+    setWindowLabel();
+    char buf[48];
+    if ((mask & 8) && !secIsAmps)
+        snprintf(buf, sizeof buf, "amps scaled %.0f to %.0f A (right axis = SoC)", amin, amax);
+    else if (secIsAmps)
+        snprintf(buf, sizeof buf, "left: volts   right: amps");
+    else if (mask & 4)
+        snprintf(buf, sizeof buf, "left: volts   right: SoC %%");
+    else
+        snprintf(buf, sizeof buf, "left: volts");
+    lv_label_set_text(lblScale, buf);
+}
+
+// Axis tick labels: values are stored x100 for volts; right axis is either
+// SoC (0..100 %) or amps mapped onto 0..100.
+static void onChartDraw(lv_event_t* e) {
+    lv_obj_draw_part_dsc_t* d = lv_event_get_draw_part_dsc(e);
+    if (!lv_obj_draw_part_check_type(d, &lv_chart_class, LV_CHART_DRAW_PART_TICK_LABEL)) return;
+    if (!d->text) return;
+    if (d->id == LV_CHART_AXIS_PRIMARY_Y) {
+        int v = d->value;
+        lv_snprintf(d->text, d->text_length, "%d.%d", v / 100, (abs(v) % 100) / 10);
+    } else if (d->id == LV_CHART_AXIS_SECONDARY_Y) {
+        if (secIsAmps) {
+            float a = ampMin + d->value / 100.0f * (ampMax - ampMin);
+            lv_snprintf(d->text, d->text_length, "%d", (int)lroundf(a));
+        } else {
+            lv_snprintf(d->text, d->text_length, "%d%%", d->value);
+        }
+    }
+}
+
+static void onSeriesToggle(lv_event_t* e) {
+    int bit = (int)(intptr_t)lv_event_get_user_data(e);
+    bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+    if (on) g_settings.chartMask |= (1 << bit);
+    else    g_settings.chartMask &= ~(1 << bit);
+    g_settings.save();
+    rebuildChart();
+}
+
+static void applyRangeButtons() {
+    for (int i = 0; i < 4; i++) {
+        if (i == (int)g_settings.chartRange) lv_obj_add_state(btnRange[i], LV_STATE_CHECKED);
+        else lv_obj_clear_state(btnRange[i], LV_STATE_CHECKED);
+    }
+}
+
+static void onRange(lv_event_t* e) {
+    g_settings.chartRange = (uint8_t)(intptr_t)lv_event_get_user_data(e);
+    g_settings.save();
+    chartOffset = 0;
+    applyRangeButtons();
+    rebuildChart();
+}
+
+static void onScroll(lv_event_t* e) {
+    int dir = (int)(intptr_t)lv_event_get_user_data(e);   // +1 = older
+    int mx = history::maxOffset(chartRange());
+    chartOffset += dir;
+    if (chartOffset < 0) chartOffset = 0;
+    if (chartOffset > mx) chartOffset = mx;
+    rebuildChart();
+}
+
+static lv_obj_t* mkCheckButton(lv_obj_t* parent, const char* text, int w, int h, lv_color_t on,
+                               lv_event_cb_t cb, void* ud) {
+    lv_obj_t* b = mkButton(parent, text, w, h, nullptr, nullptr, &lv_font_montserrat_14);
+    lv_obj_add_flag(b, LV_OBJ_FLAG_CHECKABLE);
+    lv_obj_set_style_bg_color(b, on, LV_STATE_CHECKED);
+    lv_obj_set_style_text_color(lv_obj_get_child(b, 0), lv_color_black(), LV_STATE_CHECKED);
+    lv_obj_add_event_cb(b, cb, LV_EVENT_VALUE_CHANGED, ud);
+    return b;
+}
+
+static void buildChart(lv_obj_t* page) {
+    // Series toggles
+    static const char* names[4] = {"Main V", "Aux V", "SoC", "Amps"};
+    static const lv_color_t cols[4] = {C_SER_MAIN, C_SER_AUX, C_SER_SOC, C_SER_AMPS};
+    const int bw = 74, bh = 30, gap = 6;
+    int bx = (LCD_H_RES - (4 * bw + 3 * gap)) / 2;
+    for (int i = 0; i < 4; i++) {
+        btnSeries[i] = mkCheckButton(page, names[i], bw, bh, cols[i], onSeriesToggle, (void*)(intptr_t)i);
+        lv_obj_set_pos(btnSeries[i], bx + i * (bw + gap), 64);
+        if (g_settings.chartMask & (1 << i)) lv_obj_add_state(btnSeries[i], LV_STATE_CHECKED);
+    }
+
+    // Chart
+    chart = lv_chart_create(page);
+    lv_obj_set_size(chart, 316, 186);
+    lv_obj_set_pos(chart, (LCD_H_RES - 316) / 2, 114);
+    lv_chart_set_type(chart, LV_CHART_TYPE_LINE);
+    lv_chart_set_point_count(chart, history::POINTS);
+    lv_chart_set_div_line_count(chart, 5, 5);
+    lv_chart_set_axis_tick(chart, LV_CHART_AXIS_PRIMARY_Y, 6, 3, 5, 2, true, 44);
+    lv_chart_set_axis_tick(chart, LV_CHART_AXIS_SECONDARY_Y, 6, 3, 5, 2, true, 44);
+    lv_chart_set_axis_tick(chart, LV_CHART_AXIS_PRIMARY_X, 6, 3, 5, 2, false, 10);
+    lv_obj_set_style_bg_color(chart, C_BG, 0);
+    lv_obj_set_style_border_color(chart, C_GRID, 0);
+    lv_obj_set_style_border_width(chart, 1, 0);
+    lv_obj_set_style_radius(chart, 0, 0);
+    lv_obj_set_style_pad_all(chart, 2, 0);
+    lv_obj_set_style_line_color(chart, C_GRID, LV_PART_MAIN);
+    lv_obj_set_style_line_width(chart, 2, LV_PART_ITEMS);
+    lv_obj_set_style_size(chart, 0, LV_PART_INDICATOR);   // no point markers
+    lv_obj_set_style_text_font(chart, &lv_font_montserrat_12, LV_PART_TICKS);
+    lv_obj_set_style_text_color(chart, C_DIM, LV_PART_TICKS);
+    lv_obj_set_style_line_color(chart, C_DIM, LV_PART_TICKS);
+    lv_obj_clear_flag(chart, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(chart, onChartDraw, LV_EVENT_DRAW_PART_BEGIN, nullptr);
+
+    serMain = lv_chart_add_series(chart, C_SER_MAIN, LV_CHART_AXIS_PRIMARY_Y);
+    serAux  = lv_chart_add_series(chart, C_SER_AUX,  LV_CHART_AXIS_PRIMARY_Y);
+    serSoc  = lv_chart_add_series(chart, C_SER_SOC,  LV_CHART_AXIS_SECONDARY_Y);
+    serAmps = lv_chart_add_series(chart, C_SER_AMPS, LV_CHART_AXIS_SECONDARY_Y);
+
+    lblWindow = mkLabel(page, &lv_font_montserrat_14, C_TEXT);
+    lv_obj_align(lblWindow, LV_ALIGN_TOP_MID, 0, 310);
+
+    // Range + scroll row
+    static const char* rn[4] = {"Hour", "Day", "Week", "Month"};
+    const int aw = 40, rw = 62, rh = 32, rg = 6;
+    int total = 2 * aw + 4 * rw + 5 * rg;
+    int x = (LCD_H_RES - total) / 2, y = 336;
+    lv_obj_t* bl = mkButton(page, LV_SYMBOL_LEFT, aw, rh, onScroll, (void*)(intptr_t)1);
+    lv_obj_set_pos(bl, x, y);
+    x += aw + rg;
+    for (int i = 0; i < 4; i++) {
+        btnRange[i] = mkButton(page, rn[i], rw, rh, onRange, (void*)(intptr_t)i, &lv_font_montserrat_14);
+        lv_obj_add_flag(btnRange[i], LV_OBJ_FLAG_CHECKABLE);
+        lv_obj_set_style_bg_color(btnRange[i], C_ACCENT, LV_STATE_CHECKED);
+        lv_obj_set_style_text_color(lv_obj_get_child(btnRange[i], 0), lv_color_black(), LV_STATE_CHECKED);
+        lv_obj_set_pos(btnRange[i], x, y);
+        x += rw + rg;
+    }
+    lv_obj_t* br = mkButton(page, LV_SYMBOL_RIGHT, aw, rh, onScroll, (void*)(intptr_t)-1);
+    lv_obj_set_pos(br, x, y);
+    applyRangeButtons();
+
+    lblScale = mkLabel(page, &lv_font_montserrat_12, C_DIM);
+    lv_obj_align(lblScale, LV_ALIGN_TOP_MID, 0, 378);
+    lv_label_set_text(lblScale, "");
+
+    rebuildChart();
+}
+
+// ---------------------------------------------------------------------------
+// Page 3: Setup
 // ---------------------------------------------------------------------------
 static void onCapacity(lv_event_t* e) {
     int delta = (int)(intptr_t)lv_event_get_user_data(e);
@@ -242,19 +558,6 @@ static void onPause(lv_event_t*) {
 
 static void onForget(lv_event_t*) {
     batmon::g_client.forgetDevice();
-}
-
-static lv_obj_t* mkButton(lv_obj_t* parent, const char* text, int w, int h, lv_event_cb_t cb, void* ud) {
-    lv_obj_t* b = lv_btn_create(parent);
-    lv_obj_set_size(b, w, h);
-    lv_obj_set_style_bg_color(b, lv_color_hex(0x2A2A2A), 0);
-    lv_obj_set_style_bg_color(b, C_ACCENT, LV_STATE_PRESSED);
-    lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, ud);
-    lv_obj_t* l = lv_label_create(b);
-    lv_obj_set_style_text_font(l, &lv_font_montserrat_16, 0);
-    lv_label_set_text(l, text);
-    lv_obj_center(l);
-    return b;
 }
 
 static void buildSetup(lv_obj_t* page) {
@@ -317,6 +620,11 @@ static void buildSetup(lv_obj_t* page) {
 // ---------------------------------------------------------------------------
 // Public
 // ---------------------------------------------------------------------------
+static void onTileChanged(lv_event_t*) {
+    chartVisible = (lv_tileview_get_tile_act(tv) == pChart);
+    if (chartVisible) rebuildChart();
+}
+
 void create(board::Display& display) {
     g_disp = &display;
 
@@ -329,14 +637,17 @@ void create(board::Display& display) {
 
     lv_obj_t* pHalo   = lv_tileview_add_tile(tv, 0, 0, LV_DIR_RIGHT);
     lv_obj_t* pDetail = lv_tileview_add_tile(tv, 1, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
-    lv_obj_t* pSetup  = lv_tileview_add_tile(tv, 2, 0, LV_DIR_LEFT);
-    for (lv_obj_t* p : {pHalo, pDetail, pSetup}) {
+    pChart            = lv_tileview_add_tile(tv, 2, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
+    lv_obj_t* pSetup  = lv_tileview_add_tile(tv, 3, 0, LV_DIR_LEFT);
+    for (lv_obj_t* p : {pHalo, pDetail, pChart, pSetup}) {
         lv_obj_set_style_bg_color(p, C_BG, 0);
         lv_obj_clear_flag(p, LV_OBJ_FLAG_SCROLLABLE);
     }
+    lv_obj_add_event_cb(tv, onTileChanged, LV_EVENT_VALUE_CHANGED, nullptr);
 
     buildHalo(pHalo);
     buildDetail(pDetail);
+    buildChart(pChart);
     buildSetup(pSetup);
 }
 
@@ -356,7 +667,7 @@ void update(const State& s) {
         lv_arc_set_value(arc, (int)lroundf(s.soc));
         lv_obj_set_style_arc_color(arc, vStale ? C_STALE : socColor(s.soc), LV_PART_INDICATOR);
     } else {
-        lv_label_set_text(lblSoc, s.volts.valid() ? "" : "--");
+        lv_label_set_text(lblSoc, "--");
         lv_obj_add_flag(lblSocUnit, LV_OBJ_FLAG_HIDDEN);
         lv_arc_set_value(arc, 0);
     }
@@ -364,8 +675,13 @@ void update(const State& s) {
 
     if (s.volts.valid()) snprintf(buf, sizeof buf, "%.2f V", s.volts.value);
     else snprintf(buf, sizeof buf, "-- V");
-    lv_label_set_text(lblVolts, buf);
-    lv_obj_set_style_text_color(lblVolts, txt, 0);
+    lv_label_set_text(lblMainV, buf);
+    lv_obj_set_style_text_color(lblMainV, txt, 0);
+
+    if (s.extVolts.valid()) snprintf(buf, sizeof buf, "%.2f V", s.extVolts.value);
+    else snprintf(buf, sizeof buf, "-- V");
+    lv_label_set_text(lblAuxV, buf);
+    lv_obj_set_style_text_color(lblAuxV, stale(s.extVolts) ? C_STALE : C_TEXT, 0);
 
     if (s.current.valid()) {
         float a = s.current.value;
@@ -393,6 +709,17 @@ void update(const State& s) {
         lv_label_set_text(lblRuntime, "Set capacity for SoC");
     } else {
         lv_label_set_text(lblRuntime, "");
+    }
+
+    // Alert: aux battery is being charged but the main one is not.
+    bool alert = !stale(s.extVolts) && !stale(s.current) &&
+                 s.extVolts.value > ALERT_AUX_CHARGING_V &&
+                 s.current.value < ALERT_MAIN_CHARGING_A;
+    if (alert) {
+        lv_label_set_text(lblAlert, LV_SYMBOL_WARNING " Aux charging, main is not");
+        lv_obj_clear_flag(lblAlert, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(lblAlert, LV_OBJ_FLAG_HIDDEN);
     }
 
     // Link status
@@ -441,12 +768,19 @@ void update(const State& s) {
     lv_label_set_text(detVal[D_ADDR], s.deviceAddr[0] ? s.deviceAddr : "--");
 
     // Reflect the device's real pin state without firing our own handlers.
-    suppressSwitchEvents = true;
-    if (s.relay.valid() && s.relay.value > 0.5f) lv_obj_add_state(swRelay, LV_STATE_CHECKED);
-    else lv_obj_clear_state(swRelay, LV_STATE_CHECKED);
-    if (s.sw.valid() && s.sw.value > 0.5f) lv_obj_add_state(swSwitch, LV_STATE_CHECKED);
-    else lv_obj_clear_state(swSwitch, LV_STATE_CHECKED);
-    suppressSwitchEvents = false;
+    if ((int32_t)(millis() - switchHoldUntilMs) >= 0) {
+        suppressSwitchEvents = true;
+        bool relayOn = s.relay.valid() && s.relay.value > 0.5f;
+        bool swOn = s.sw.valid() && s.sw.value > 0.5f;
+        for (lv_obj_t* o : {swSwitch, swHaloSwitch}) {
+            if (swOn) lv_obj_add_state(o, LV_STATE_CHECKED); else lv_obj_clear_state(o, LV_STATE_CHECKED);
+        }
+        if (relayOn) lv_obj_add_state(swRelay, LV_STATE_CHECKED); else lv_obj_clear_state(swRelay, LV_STATE_CHECKED);
+        suppressSwitchEvents = false;
+    }
+
+    // ---- Chart page ----
+    if (chartVisible && millis() - lastChartMs >= CHART_REFRESH_MS) rebuildChart();
 
     // ---- Setup page ----
     lv_label_set_text(btnPauseLbl, s.link == LinkState::Paused ? "Resume BLE" : "Pause BLE 5 min");

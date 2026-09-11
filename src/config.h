@@ -9,7 +9,7 @@
 // Firmware identity
 // ---------------------------------------------------------------------------
 #define FW_NAME     "batmon-display"
-#define FW_VERSION  "0.1.0"
+#define FW_VERSION  "0.2.0"
 
 // ---------------------------------------------------------------------------
 // I2C bus (shared: TCA9554 IO expander, CST820 touch, QMI8658 IMU, PCF85063 RTC)
@@ -92,10 +92,14 @@
 // ---------------------------------------------------------------------------
 #define BLE_SCAN_MS               6000   // one scan pass
 #define BLE_CONNECT_TIMEOUT_MS    10000
-#define BLE_POLL_FAST_MS          1000   // V / I / T / Ah
-#define BLE_POLL_SLOW_MS          30000  // Ah max, ext V, int T, relay, switch
+#define BLE_POLL_FAST_MS          1000   // V / I / T / Ah / aux V / switch
+#define BLE_POLL_SLOW_MS          30000  // Ah max/min, int T, relay
 #define BLE_RECONNECT_BACKOFF_MS  2000
 #define BLE_PAUSE_DEFAULT_MS      (5 * 60 * 1000)  // "let the phone app in" pause
 
 #define UI_REFRESH_MS             250
+#define CHART_REFRESH_MS          5000
+// Alert: aux battery is on charge but the main battery is not
+#define ALERT_AUX_CHARGING_V      13.0f
+#define ALERT_MAIN_CHARGING_A     0.2f
 #define DATA_STALE_MS             10000  // grey-out readings older than this

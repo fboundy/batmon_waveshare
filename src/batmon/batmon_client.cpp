@@ -1,6 +1,7 @@
 #include "batmon_client.h"
 
 #include <Arduino.h>
+#include <math.h>
 #include <string.h>
 
 #include "esp_log.h"
@@ -10,6 +11,7 @@
 #include "freertos/task.h"
 
 #include "../config.h"
+#include "../history.h"
 #include "../settings.h"
 
 static const char* TAG = "batmon";
@@ -245,17 +247,21 @@ static void store(Reading& r, const SensorReply& rep) {
 bool Client::pollFast() {
     SensorReply rep;
     bool ok = true;
-    Reading v, i, t, ah;
+    Reading v, i, t, ah, ev, sw;
     if (readSensor(SensorType::BatVolts, Mode::Value, rep))    store(v, rep);  else ok = false;
     if (readSensor(SensorType::BatCurrent, Mode::Value, rep))  store(i, rep);  else ok = false;
     if (readSensor(SensorType::ExtTemp, Mode::Value, rep))     store(t, rep);  else ok = false;
     if (readSensor(SensorType::BatAmpHours, Mode::Value, rep)) store(ah, rep); else ok = false;
+    if (readSensor(SensorType::ExtVolts, Mode::Value, rep))    store(ev, rep); else ok = false;
+    if (readSensor(SensorType::SwitchPin, Mode::Value, rep))   store(sw, rep); else ok = false;
 
     xSemaphoreTake((SemaphoreHandle_t)mutex_, portMAX_DELAY);
     if (v.valid())  state_.volts = v;
     if (i.valid())  state_.current = i;
     if (t.valid())  state_.extTemp = t;
     if (ah.valid()) state_.ampHours = ah;
+    if (ev.valid()) state_.extVolts = ev;
+    if (sw.valid()) state_.sw = sw;
     if (ok) state_.pollOk++; else state_.pollErrors++;
     if (client_) state_.rssi = client_->getRssi();
     xSemaphoreGive((SemaphoreHandle_t)mutex_);
@@ -265,21 +271,17 @@ bool Client::pollFast() {
 bool Client::pollSlow() {
     SensorReply rep;
     bool ok = true;
-    Reading ahMax, ahMin, ev, it, rl, sw;
+    Reading ahMax, ahMin, it, rl;
     if (readSensor(SensorType::BatAmpHours, Mode::Max, rep))   store(ahMax, rep); else ok = false;
     if (readSensor(SensorType::BatAmpHours, Mode::Min, rep))   store(ahMin, rep); else ok = false;
-    if (readSensor(SensorType::ExtVolts, Mode::Value, rep))    store(ev, rep);    else ok = false;
     if (readSensor(SensorType::IntTemp, Mode::Value, rep))     store(it, rep);    else ok = false;
     if (readSensor(SensorType::RelayPin, Mode::Value, rep))    store(rl, rep);    else ok = false;
-    if (readSensor(SensorType::SwitchPin, Mode::Value, rep))   store(sw, rep);    else ok = false;
 
     xSemaphoreTake((SemaphoreHandle_t)mutex_, portMAX_DELAY);
     if (ahMax.valid()) state_.ampHoursMax = ahMax;
     if (ahMin.valid()) state_.ampHoursMin = ahMin;
-    if (ev.valid())    state_.extVolts = ev;
     if (it.valid())    state_.intTemp = it;
     if (rl.valid())    state_.relay = rl;
-    if (sw.valid())    state_.sw = sw;
     xSemaphoreGive((SemaphoreHandle_t)mutex_);
     return ok;
 }
@@ -306,7 +308,13 @@ void Client::computeDerived() {
         s.soc = -1;
         s.hoursRemaining = -1;
     }
+    history::Sample hs;
+    hs.mainV   = s.volts.valid()    ? s.volts.value    : NAN;
+    hs.auxV    = s.extVolts.valid() ? s.extVolts.value : NAN;
+    hs.soc     = s.soc >= 0         ? s.soc            : NAN;
+    hs.current = s.current.valid()  ? s.current.value  : NAN;
     xSemaphoreGive((SemaphoreHandle_t)mutex_);
+    history::push(hs);
 }
 
 bool Client::execSetIo(IoType io, bool on) {
@@ -372,6 +380,7 @@ void Client::taskEntry(void* arg) {
 
 void Client::task() {
     for (;;) {
+        history::tick();
         // ---- paused? ----
         State s = snapshot();
         if (s.link == LinkState::Paused) {
@@ -427,6 +436,7 @@ void Client::task() {
         wantReconnect_ = false;
         uint32_t consecutiveFail = 0;
         while (!linkDropped_ && !wantReconnect_) {
+            history::tick();
             uint32_t t0 = millis();
             bool ok = pollFast();
             if (ok && (lastSlowPollMs_ == 0 || millis() - lastSlowPollMs_ >= BLE_POLL_SLOW_MS)) {

@@ -16,6 +16,8 @@ void Settings::load() {
     brightness     = p.getUChar("bright", brightness);
     fahrenheit     = p.getBool("degf", fahrenheit);
     pollMs         = p.getUShort("poll", pollMs);
+    chartMask      = p.getUChar("cmask", chartMask);
+    chartRange     = p.getUChar("crange", chartRange);
     p.end();
 }
 
@@ -28,6 +30,8 @@ void Settings::save() const {
     p.putUChar("bright", brightness);
     p.putBool("degf", fahrenheit);
     p.putUShort("poll", pollMs);
+    p.putUChar("cmask", chartMask);
+    p.putUChar("crange", chartRange);
     p.end();
 }
 

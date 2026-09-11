@@ -2,10 +2,7 @@
 
 ## Needs a real BatMon to confirm (please report!)
 
-1. **Does it connect and poll?** The protocol is implemented exactly as the
-   HA integration does it, but has not yet been run against hardware from
-   this firmware. First run: watch the serial log for the GATT table and the
-   first `pollOk` increments.
+1. ~~Does it connect and poll?~~ **Yes** — verified 2026-09-11 with a BatMon 30A.
 2. **Enclosing service UUID** of the `0303` / `0105` characteristics — the
    firmware logs it. Once known it can be used to shortcut discovery.
 3. **Epoch byte order** in `MIN` / `MAX` replies (LE assumed).
@@ -22,8 +19,12 @@
 - [ ] Auto-dim / night mode (time-of-day via RTC, or ambient via a schedule)
 - [ ] Screen-off after inactivity with tap-to-wake (touch INT on GPIO16)
 - [ ] Smoothed current / power (EMA) for a calmer runtime estimate
-- [ ] Sparkline history for voltage / current (last hour, in PSRAM)
-- [ ] Configurable low-SoC / low-voltage alarm using the onboard buzzer
+- [x] History chart (V / aux V / SoC / I; hour–month) — RAM only
+- [ ] Persist history to the TF card so it survives reboots; use the RTC for
+      real timestamps on the chart axis
+- [x] Charge-mismatch alert (aux charging, main not) on the main page
+- [ ] Configurable low-SoC / low-voltage alarm using the onboard buzzer;
+      optionally beep on the charge-mismatch alert too
 - [ ] Multiple BatMon support: swipe between banks (e.g. leisure + starter)
 
 ### Connectivity

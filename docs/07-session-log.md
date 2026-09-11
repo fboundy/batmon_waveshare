@@ -61,7 +61,37 @@ continue on another machine. Newest entries at the bottom.
 4. Then the roadmap in [06-roadmap.md](06-roadmap.md) (screen sleep, smoothing,
    Wi-Fi/MQTT, OTA).
 
-### Unflashed change
-Commit `ef11e63` (advertiser dump at debug level) was pushed but the board
-still runs the previous build; behaviour is identical at the default log
-level, so reflash whenever convenient.
+## 2026-09-11 (later) - first contact with the BatMon, v0.2.0
+
+### Verified
+- Display taken to the vehicle: connected to `BK-Battery1`, showed 100 %,
+  13.19 V, discharging 0.9 A / 12 W, 17.2 C, "31h 56m to empty",
+  Connected. **The protocol as implemented from the HA integration is
+  confirmed working.** Current sign convention (negative = discharge) is
+  as expected.
+- Serial log with the GATT table was not captured on that run (board was
+  on vehicle USB) - still wanted for docs/02 section 2.
+
+### Bug found from the photo
+- The SoC `%` sat low and to the right of the digits: it had been placed
+  with `lv_obj_align_to()` once, relative to the placeholder `--`, and never
+  moved when the digits got wider. Fixed by putting digits + unit in a flex
+  row with bottom alignment and a baseline correction.
+
+### Added (v0.2.0)
+- Halo page: SoC moved up, `%` baseline-aligned; **Main** and **Aux**
+  voltage side by side with captions; **Switch** toggle; red alert when aux
+  > 13.0 V while main current < 0.2 A (`ALERT_*` in `config.h`).
+- Aux voltage and switch state moved into the 1 s poll group.
+- `src/history.*`: 15 s x 24 h and 6 min x 30 d ring buffers in PSRAM.
+- New **Chart** page (3rd tile): Main V / Aux V / SoC / Amps toggles,
+  Hour / Day / Week / Month, scroll arrows. Selections persist in NVS.
+- Switch widgets hold the user's tap for 3 s before re-syncing from the
+  device.
+
+### Not yet done
+- Flash v0.2.0 to the board: it was unplugged from the PC when the build
+  finished (no COM port). Build is clean (RAM 41.7 %, flash 16.9 %); run
+  `pio run -t upload` when it is back on USB.
+- History is RAM-only and relative-time; TF-card persistence and RTC
+  timestamps are on the roadmap.

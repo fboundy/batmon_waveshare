@@ -29,7 +29,8 @@ Windows gotchas (both cost real time the first session):
   test vectors were cross-checked against the HA Python classes.
 - `src/batmon/batmon_client.*` — NimBLE 2.x central task (core 0). All BLE calls happen here.
 - `src/board/*` — TCA9554, ST7701 RGB panel (init table copied from Waveshare demo), CST820, LVGL 8.3 port.
-- `src/ui/ui.cpp` — three tileview pages. Only the loop task touches LVGL.
+- `src/ui/ui.cpp` — four tileview pages (Halo, Details, Chart, Setup). Only the loop task touches LVGL.
+- `src/history.*` — PSRAM ring buffers behind the chart page; fed from the BLE task.
 - `src/config.h` — every pin and tunable.
 - `include/lv_conf.h` — LVGL config (fonts 14–48 enabled, demos off).
 

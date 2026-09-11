@@ -18,7 +18,7 @@ This project reproduces it on the 2.1" 480 × 480 Waveshare panel.
 | Wireless BLE connection | ✅ | |
 | Automatic reconnection | ✅ | 2 s backoff, indefinite retries |
 | Simple USB-powered installation | ✅ | Any 5 V USB-C supply; the board also takes a LiPo |
-| Works with every BatMon | ✅ (30A/100A/500A/positive variants share the protocol) | Only tested against the protocol as implemented by the HA integration |
+| Works with every BatMon | ✅ | Verified with a BatMon 30A; other variants share the protocol |
 | Multiple Halos on one BatMon | ❓ | Unknown whether BatMon accepts several centrals; see [02-ble-protocol.md §7](02-ble-protocol.md#7-concurrency-caveat) |
 | OTA firmware update from the BatMon app | ❌ | Not applicable; flash over USB. Wi-Fi OTA is on the roadmap |
 | Easy retrofit to existing BatMon systems | ✅ | Nothing on the BatMon side changes |
@@ -27,6 +27,15 @@ This project reproduces it on the 2.1" 480 × 480 Waveshare panel.
 
 Already implemented:
 
+* **Second battery voltage** (BatMon's external voltage input) on the main
+  page, labelled Main / Aux.
+* **Switch output toggle** on the main page; relay on the Details page.
+* **Charge-mismatch alert** on the main page when the aux battery is being
+  charged (> 13.0 V) but the main battery is not (current < 0.2 A) — e.g.
+  a split-charge relay or DC-DC charger not engaging.
+* **History chart page** — Main V, Aux V, SoC and current over the last
+  Hour / Day / Week / Month, scrollable back through 24 h of 15 s samples and
+  30 days of 6 min samples (RAM only; lost on reboot).
 * **Details page** — raw Ah counter, full/min reference, external voltage,
   BatMon CPU temperature, RSSI, poll statistics, MAC address.
 * **Relay and switch control** from the display (the HA switch entities).

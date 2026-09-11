@@ -58,13 +58,17 @@ All tunables are in `src/config.h`:
 | Define | Default | Meaning |
 |---|---|---|
 | `BLE_SCAN_MS` | 6000 | length of one scan pass |
-| `BLE_POLL_FAST_MS` | 1000 | V/I/T/Ah poll period (overridden by the `pollMs` setting) |
-| `BLE_POLL_SLOW_MS` | 30000 | Ah max/min, ext V, CPU temp, relay, switch |
+| `BLE_POLL_FAST_MS` | 1000 | V/I/T/Ah/aux V/switch poll period (overridden by the `pollMs` setting) |
+| `BLE_POLL_SLOW_MS` | 30000 | Ah max/min, CPU temp, relay |
+| `CHART_REFRESH_MS` | 5000 | how often the chart page redraws while visible |
+| `ALERT_AUX_CHARGING_V` | 13.0 | aux voltage above which "aux is charging" |
+| `ALERT_MAIN_CHARGING_A` | 0.2 | main current below which "main is not charging" |
 | `BLE_PAUSE_DEFAULT_MS` | 300000 | "Pause BLE" duration |
 | `DATA_STALE_MS` | 10000 | readings older than this are greyed out |
 | `BL_DEFAULT_PERCENT` | 80 | backlight until the saved setting is loaded |
 
-User settings (capacity, preferred device, brightness, units, poll period)
+User settings (capacity, preferred device, brightness, units, poll period,
+chart series/range)
 live in NVS and survive re-flashing unless the NVS partition is erased
 (`pio run -t erase`).
 

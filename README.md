@@ -8,9 +8,13 @@ running on the Waveshare
 
 It connects to a BatMon over Bluetooth LE, stays connected, and shows:
 
-* State of charge (270° ring + %), voltage, current with charge/discharge
-  direction, power, battery temperature, time to empty / full
+* State of charge (270° ring + %), main and aux battery voltage, current with
+  charge/discharge direction, power, battery temperature, time to empty /
+  full, a **switch output** toggle, and an alert when the aux battery is
+  charging but the main one is not
 * A details page with every raw reading and **relay / switch control**
+* A chart page: main V / aux V / SoC / current over the last hour, day, week
+  or month, scrollable
 * A setup page for battery capacity, brightness, °C/°F, and a **Pause BLE**
   button that lets the phone app in for five minutes
 
@@ -18,10 +22,9 @@ The BLE protocol was reverse-engineered from the official
 [Home Assistant integration](https://github.com/ringonotts/batmon_ha) — see
 [docs/02-ble-protocol.md](docs/02-ble-protocol.md).
 
-> **Status:** compiles and runs the UI; the BLE client implements the protocol
-> exactly as the HA integration does but has **not yet been verified against a
-> physical BatMon**. See [docs/06-roadmap.md](docs/06-roadmap.md) for what to
-> check first.
+> **Status:** working against a real BatMon 30A (connects, polls, shows live
+> readings). See [docs/07-session-log.md](docs/07-session-log.md) for the
+> current state and [docs/06-roadmap.md](docs/06-roadmap.md) for what's next.
 
 ## Quick start
 
@@ -31,7 +34,7 @@ pio run -t upload          # flash over USB-C
 pio device monitor         # 115200 baud
 ```
 
-Swipe right on the display for details, again for setup. Enter your battery
+Swipe left on the display for details, again for the chart, again for setup. Enter your battery
 bank capacity in Ah to enable the SoC reading. The first BatMon found is
 remembered; use *Forget device* to change it.
 

@@ -165,12 +165,12 @@ then disconnects, every 60 s. The firmware instead stays connected and polls:
 
 | Group | Sensors | Default period |
 |---|---|---|
-| fast | `BAT_VOLTS`, `BAT_CURRENT`, `EXT_TEMP`, `BAT_AMPHOURS` (VALUE) | 1 s (Setup → `pollMs`) |
-| slow | `BAT_AMPHOURS` (MAX, MIN), `EXT_VOLTS`, `INT_TEMP`, `RELAY_PIN`, `SWITCH_PIN` | 30 s |
+| fast | `BAT_VOLTS`, `BAT_CURRENT`, `EXT_TEMP`, `BAT_AMPHOURS` (VALUE), `EXT_VOLTS`, `SWITCH_PIN` | 1 s (`pollMs` setting) |
+| slow | `BAT_AMPHOURS` (MAX, MIN), `INT_TEMP`, `RELAY_PIN` | 30 s |
 
 Each read is a write-with-response followed by a read, i.e. two connection
-events. With a 15–30 ms connection interval the fast group completes in well
-under 500 ms.
+events. With a 15–30 ms connection interval the fast group (12 round trips)
+completes in well under 500 ms.
 
 ## 7. Concurrency caveat
 
@@ -183,3 +183,10 @@ be used, then reconnects automatically.
 (The Halo marketing says multiple Halos can attach to one BatMon, which
 suggests newer BatMon firmware allows several centrals *or* that Halo uses
 advertisement data — unconfirmed.)
+
+## 8. Verified on hardware (2026-09-11)
+
+The connect / discover / poll path above has been run against a real BatMon
+30A: it is discovered, connects, and returns sane values (13.19 V, −0.9 A,
+17.2 °C, `BK-Battery1` name stripped to `Battery1`). The full GATT table has
+not yet been captured from the serial log — see [06-roadmap.md](06-roadmap.md).

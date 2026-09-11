@@ -14,6 +14,9 @@ struct Settings {
     bool    fahrenheit = false;
     // BLE polling period for the fast group (ms)
     uint16_t pollMs = 1000;
+    // Chart page: bit0 main V, bit1 aux V, bit2 SoC, bit3 current; range 0..3
+    uint8_t chartMask = 0x01;
+    uint8_t chartRange = 0;
 
     void load();
     void save() const;

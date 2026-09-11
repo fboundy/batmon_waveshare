@@ -1,8 +1,10 @@
-// LVGL user interface.  Three horizontally-swipeable pages on a 480x480 round
+// LVGL user interface.  Four horizontally-swipeable pages on a 480x480 round
 // panel:
-//   0  Halo   - SoC dial, voltage, current, power, temperature (the BatMon Halo look)
+//   0  Halo   - SoC dial, main/aux voltage, current, power, temperature,
+//               switch control, charge-mismatch alert (the BatMon Halo look)
 //   1  Detail - every raw reading, link stats, relay / switch control
-//   2  Setup  - battery capacity, brightness, units, pause BLE, forget device
+//   2  Chart  - history of main V / aux V / SoC / current; Hour/Day/Week/Month
+//   3  Setup  - battery capacity, brightness, units, pause BLE, forget device
 #pragma once
 
 #include <lvgl.h>

@@ -12,6 +12,7 @@
 #include "board/tca9554.h"
 #include "board/touch.h"
 #include "config.h"
+#include "history.h"
 #include "settings.h"
 #include "ui/ui.h"
 
@@ -44,6 +45,7 @@ void setup() {
         g_lvgl.unlock();
     }
 
+    history::begin();
     batmon::g_client.begin();
     Serial.println("setup done");
 }
