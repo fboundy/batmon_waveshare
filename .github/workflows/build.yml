@@ -18,7 +18,8 @@ jobs:
             ~/.platformio
             ~/.espressif
           key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
-      - run: pip install platformio
+      # click 8.2 breaks the esptool 5.0 bundled with pioarduino (get_metavar ctx)
+      - run: pip install platformio "click<8.2"
       - name: Host unit tests (protocol codec)
         run: pio test -e native
       - name: Build firmware
