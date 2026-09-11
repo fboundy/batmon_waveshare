@@ -40,12 +40,13 @@ void setup() {
     g_touch.begin(g_io);
     g_lvgl.begin(g_display, g_touch);
 
+    history::begin();   // before the UI: the chart page reads it at build time
+
     if (g_lvgl.lock()) {
         ui::create(g_display);
         g_lvgl.unlock();
     }
 
-    history::begin();
     batmon::g_client.begin();
     Serial.println("setup done");
 }

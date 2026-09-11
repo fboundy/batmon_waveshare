@@ -89,9 +89,18 @@ continue on another machine. Newest entries at the bottom.
 - Switch widgets hold the user's tap for 3 s before re-syncing from the
   device.
 
+### Flashed
+- v0.2.0 first flash boot-looped: `ui::create()` builds the chart page,
+  which calls `history::window()`, before `history::begin()` had created
+  its mutex (`assert xQueueSemaphoreTake`). Fixed by initialising history
+  before the UI in `main.cpp`. Reflashed; boots clean, scans, no BatMon in
+  range at the desk. **Not yet seen against the BatMon** - check the new
+  Halo layout, the Aux voltage, the switch and the chart on the vehicle.
+- Lesson: anything the UI reads at build time must be initialised before
+  `ui::create()`.
+- Note: if the board is boot-looping, the first `pio run -t upload` can
+  lose the COM port mid-reset; just run it again.
+
 ### Not yet done
-- Flash v0.2.0 to the board: it was unplugged from the PC when the build
-  finished (no COM port). Build is clean (RAM 41.7 %, flash 16.9 %); run
-  `pio run -t upload` when it is back on USB.
 - History is RAM-only and relative-time; TF-card persistence and RTC
   timestamps are on the roadmap.
