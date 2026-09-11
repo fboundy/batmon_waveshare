@@ -1,0 +1,32 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.espressif
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+      - run: pip install platformio
+      - name: Host unit tests (protocol codec)
+        run: pio test -e native
+      - name: Build firmware
+        run: pio run -e waveshare_s3_lcd_2_1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: |
+            .pio/build/waveshare_s3_lcd_2_1/firmware.bin
+            .pio/build/waveshare_s3_lcd_2_1/bootloader.bin
+            .pio/build/waveshare_s3_lcd_2_1/partitions.bin
