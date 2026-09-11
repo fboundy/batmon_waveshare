@@ -122,6 +122,20 @@ bool Client::scanAndPick(NimBLEAddress& addr, std::string& name, int& rssi) {
     bool havePreferred = g_settings.deviceAddr[0] != 0;
     for (int i = 0; i < res.getCount(); i++) {
         const NimBLEAdvertisedDevice* d = res.getDevice(i);
+        // Dump everything we know about each advertiser so an unrecognised
+        // BatMon can be identified from the serial log.
+        {
+            std::string md = d->getManufacturerData();
+            char mdHex[64] = {0};
+            for (size_t k = 0; k < md.size() && k < 20; k++)
+                snprintf(mdHex + k * 3, sizeof mdHex - k * 3, "%02x ", (uint8_t)md[k]);
+            std::string svcs;
+            for (int s = 0; s < d->getServiceUUIDCount(); s++)
+                svcs += d->getServiceUUID(s).toString() + " ";
+            ESP_LOGD(TAG, "adv %s rssi=%d name='%s' mfg=[%s] svc=[%s]",
+                     d->getAddress().toString().c_str(), d->getRSSI(),
+                     d->haveName() ? d->getName().c_str() : "", mdHex, svcs.c_str());
+        }
         if (!isBatMon(d)) continue;
         ESP_LOGI(TAG, "  BatMon candidate %s '%s' rssi=%d", d->getAddress().toString().c_str(),
                  d->getName().c_str(), d->getRSSI());
