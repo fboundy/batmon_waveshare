@@ -6,3 +6,6 @@ __pycache__/
 .dummy/
 sdkconfig.defaults
 sdkconfig.*
+managed_components/
+dependencies.lock
+*firmware.map
