@@ -22,8 +22,8 @@ jobs:
       - run: pip install platformio "click<8.2"
       - name: Host unit tests (protocol codec)
         run: pio test -e native
-      - name: Build firmware
-        run: pio run -e waveshare_s3_lcd_2_1
+      - name: Build firmware (both boards)
+        run: pio run -e waveshare_s3_lcd_2_1 -e waveshare_s3_lcd_1_9
       - uses: actions/upload-artifact@v4
         with:
           name: firmware
@@ -31,3 +31,6 @@ jobs:
             .pio/build/waveshare_s3_lcd_2_1/firmware.bin
             .pio/build/waveshare_s3_lcd_2_1/bootloader.bin
             .pio/build/waveshare_s3_lcd_2_1/partitions.bin
+            .pio/build/waveshare_s3_lcd_1_9/firmware.bin
+            .pio/build/waveshare_s3_lcd_1_9/bootloader.bin
+            .pio/build/waveshare_s3_lcd_1_9/partitions.bin

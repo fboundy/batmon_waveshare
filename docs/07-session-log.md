@@ -131,5 +131,24 @@ continue on another machine. Newest entries at the bottom.
   on the background task; polling is unaffected.
 - Rotation and page order not visually checked yet (no photo).
 
+## 2026-09-12 - v0.4.0: second board (ESP32-S3-LCD-1.9), board/UI split
+
+- User asked for a version for the Waveshare ESP32-S3-LCD-1.9 (non-touch
+  variant, mounted landscape) with a **bar** SoC gauge, reusing as much as
+  possible. The board is not available yet, so this is build-verified only.
+- Refactor: `board::` interface with per-env implementations, generic
+  `LvglPort` (direct vs partial/async), `ui.cpp` logic shared with two
+  layout files, `src/boards/*.h` pin maps. The 2.1 code path is a straight
+  move; both envs build clean (2.1: RAM 41.8 % flash 17.5 %; 1.9: RAM
+  41.8 % flash 15.6 %).
+- 1.9 specifics from the Waveshare demo: ST7789 SPI on GPIO 9-14, y gap 35,
+  tuning registers B2..E1 + INVON, WS2812 on GPIO15, no RTC, BOOT = GPIO0.
+  Driven through IDF's esp_lcd ST7789 driver with `LV_COLOR_16_SWAP=1`.
+- New inputs for touch-less use, on both boards: BOOT short = next page,
+  long = cycle chart range; USB serial console (`help`).
+- **Not verified:** 2.1 regression flash - the board dropped off USB again
+  before the upload; do `pio run -t upload` when it is back. 1.9 first-run
+  checklist is in docs/08.
+
 ### Not yet done
 - Real time on the chart axis needs a time source; see roadmap.

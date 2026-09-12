@@ -2,9 +2,12 @@
 
 An open-source **BatMon Halo**-style display for the
 [BatMon](https://monitor-things.com/products/batmon-30a) BLE battery monitor,
-running on the Waveshare
-[ESP32-S3-Touch-LCD-2.1](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-2.1)
-(2.1" round 480 × 480 touchscreen).
+running on Waveshare ESP32-S3 display boards:
+
+| Board | Screen | Input | Status |
+|---|---|---|---|
+| [ESP32-S3-Touch-LCD-2.1](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-2.1) | 2.1" round 480 × 480, ring SoC gauge | touch | working |
+| [ESP32-S3-LCD-1.9](https://www.waveshare.com/wiki/ESP32-S3-LCD-1.9) | 1.9" landscape 320 × 170, bar SoC gauge | BOOT button + serial console | builds, untested |
 
 It connects to a BatMon over Bluetooth LE, stays connected, and shows:
 
@@ -30,8 +33,9 @@ The BLE protocol was reverse-engineered from the official
 
 ```sh
 pip install platformio
-pio run -t upload          # flash over USB-C
-pio device monitor         # 115200 baud
+pio run -t upload                              # 2.1 (default env), flash over USB-C
+pio run -e waveshare_s3_lcd_1_9 -t upload      # 1.9
+pio device monitor                             # 115200 baud; type 'help' for the console
 ```
 
 Swipe left on the display for the chart, again for details, again for setup. Enter your battery
@@ -48,9 +52,11 @@ hardware, protocol, architecture, build/flash, Halo feature parity, roadmap.
 ```
 platformio.ini      pioarduino platform, Arduino core 3.x, LVGL 8.3, NimBLE-Arduino 2.x
 include/lv_conf.h   LVGL config
-src/board/          Waveshare board support (TCA9554, ST7701 RGB panel, CST820, LVGL port)
+src/boards/         per-board pin maps (2.1, 1.9)
+src/board/          board interface + drivers (ST7701 RGB, ST7789 SPI, CST820, TCA9554, RTC, button, LVGL port)
 src/batmon/         BatMon protocol codec + NimBLE client
-src/ui/             LVGL pages
+src/ui/             LVGL page logic + one layout file per form factor
+src/console.cpp     serial command console
 test/               host unit tests for the codec
 docs/               documentation
 ```

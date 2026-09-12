@@ -1,4 +1,4 @@
-#include "display.h"
+#include "display_st7701.h"
 
 #include <Arduino.h>
 #include <string.h>

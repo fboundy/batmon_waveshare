@@ -12,7 +12,8 @@ that repo is the source of truth for comms; don't go hunting vendor PDFs for it.
 
 ## Build / flash / monitor
 ```
-pio run                                   # build
+pio run                                   # build (default env: 2.1 round board)
+pio run -e waveshare_s3_lcd_1_9           # 1.9 landscape board (untested on hardware)
 pio run -t upload                         # flash (auto-detects port)
 pio device monitor --baud 115200          # serial log
 pio test -e native                        # host tests for the protocol codec (needs gcc)
@@ -28,8 +29,12 @@ Windows gotchas (both cost real time the first session):
 - `src/batmon/batmon_protocol.*` — pure codec, no BLE deps, unit-tested. Change with care;
   test vectors were cross-checked against the HA Python classes.
 - `src/batmon/batmon_client.*` — NimBLE 2.x central task (core 0). All BLE calls happen here.
-- `src/board/*` — TCA9554, ST7701 RGB panel (init table copied from Waveshare demo), CST820, LVGL 8.3 port.
-- `src/ui/ui.cpp` — four tileview pages (Halo, Details, Chart, Setup). Only the loop task touches LVGL.
+- `src/boards/*.h` + `src/board/board_ws_*.cpp` — per-board pins and `board::` implementation; envs select
+  them with `-D BOARD_WS_LCD_*` and `build_src_filter`. Everything else is shared.
+- `src/board/lvgl_port.*` — generic LVGL glue (direct frame buffers for RGB panels, partial async strips for SPI).
+- `src/ui/ui.cpp` — all page behaviour; `ui_layout_round.cpp` / `ui_layout_wide.cpp` only build widgets into
+  `ui::Widgets w`. update() null-checks every handle, so a layout may omit widgets. Only the loop task touches LVGL.
+- `src/console.cpp` — serial commands; the only settings input on the touch-less 1.9.
 - `src/history.*` — PSRAM ring buffers behind the chart page; fed from the BLE task; saved to
   LittleFS `/history.bin` every 5 min by its own task; RTC (`src/board/rtc.*`) sizes the reboot gap.
 - `LCD_ROTATE_180` in `config.h`: software flip in `LvglPort::flushCb` + mirrored touch.

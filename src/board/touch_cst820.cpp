@@ -1,4 +1,4 @@
-#include "touch.h"
+#include "touch_cst820.h"
 
 #include <Arduino.h>
 #include <Wire.h>

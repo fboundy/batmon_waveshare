@@ -2,33 +2,67 @@
 
 ```
 src/
-├── main.cpp                 setup(): bring up board, UI, BLE; loop(): LVGL + UI refresh
-├── config.h                 every pin, timing and tunable in one place
+├── main.cpp                 setup(): board, history, UI, BLE, console; loop(): LVGL, button, console, UI refresh
+├── config.h                 app tunables; includes the board header selected by -D BOARD_*
+├── boards/
+│   ├── ws_lcd_2_1.h         pins / panel parameters: ESP32-S3-Touch-LCD-2.1 (round 480x480)
+│   └── ws_lcd_1_9.h         pins / panel parameters: ESP32-S3-LCD-1.9 (landscape 320x170)
 ├── settings.{h,cpp}         NVS-backed user settings (Preferences, namespace "batmon")
 ├── history.{h,cpp}          two-tier PSRAM ring buffers of V / aux V / SoC / I, persisted to LittleFS
-├── board/                   Waveshare board support
-│   ├── tca9554.*            IO expander
-│   ├── display.*            ST7701 init over 3-wire SPI + esp_lcd RGB panel + backlight PWM
-│   ├── touch.*              CST820
-│   ├── rtc.*                PCF85063, used as a monotonic clock to measure reboot gaps
-│   └── lvgl_port.*          LVGL 8.3 display/indev glue, tick timer, LVGL mutex
+├── console.{h,cpp}          USB serial command console (settings, switch/relay, pause, page)
+├── board/
+│   ├── board.h              the board interface the app uses (init, lvgl, backlight, clock, LED, button)
+│   ├── board_ws_2_1.cpp     implementation for the 2.1 (compiled only in that env)
+│   ├── board_ws_1_9.cpp     implementation for the 1.9
+│   ├── lvgl_port.*          generic LVGL 8.3 glue: direct frame buffers or partial async buffers, optional touch
+│   ├── button.*             debounced BOOT button, short / long press
+│   ├── display_st7701.*     2.1: ST7701 init over 3-wire SPI + esp_lcd RGB panel + backlight PWM
+│   ├── display_st7789.*     1.9: ST7789 over SPI via esp_lcd, DMA strips, backlight PWM
+│   ├── tca9554.*            2.1: IO expander
+│   ├── touch_cst820.*       2.1: CST820 (also CST816 on the 1.9 touch variant)
+│   └── rtc.*                2.1: PCF85063, used as a monotonic clock to measure reboot gaps
 ├── batmon/
 │   ├── batmon_protocol.*    pure encode/decode of the BatMon wire format (no BLE deps)
 │   ├── batmon_state.h       snapshot struct shared between tasks
 │   └── batmon_client.*      NimBLE central task: scan / connect / poll / relay control
 └── ui/
-    └── ui.*                 the four LVGL pages
-include/lv_conf.h            LVGL configuration (16-bit colour, Montserrat 14–48)
-src/ui/font_montserrat_72_digits.c   generated 72 px digits for the SoC (tools/gen_font.py)
+    ├── ui.*                 all page behaviour: update(), chart building, callbacks, navigation
+    ├── ui_internal.h        Widgets struct + helpers shared with the layouts
+    ├── ui_layout_round.cpp  page construction for the 480x480 round panel (arc gauge, touch)
+    ├── ui_layout_wide.cpp   page construction for 320x170 landscape (bar gauge, no touch)
+    └── font_montserrat_72_digits.c   generated 72 px digits for the round SoC (tools/gen_font.py)
+include/lv_conf.h            LVGL configuration (16-bit colour, Montserrat 12–48; byte swap per env)
 tools/gen_font.py            Pillow-based LVGL font generator (no node/lv_font_conv needed)
 test/test_protocol/          Unity tests for batmon_protocol (host, `pio test -e native`)
 ```
+
+## Board abstraction
+
+`platformio.ini` has one env per board; each defines `BOARD_WS_LCD_*`,
+which makes `config.h` pull in the matching `src/boards/*.h`, and uses
+`build_src_filter` to compile only that board's `board_*.cpp`, display
+driver and UI layout. The application talks to `board::` only:
+
+| `board::` | 2.1 | 1.9 |
+|---|---|---|
+| `init()` | I2C, TCA9554, ST7701 RGB panel, CST820, RTC, button | ST7789 SPI, button, WS2812 |
+| `lvgl()` | direct mode: LVGL draws into the two PSRAM frame buffers, software 180° flip | partial mode: two 320×40 DMA strips, async flush, rotation in MADCTL |
+| `clock()` / `clockValid()` | PCF85063 | none — history gap assumed zero |
+| `setStatusLed()` | no-op | WS2812 green / blue / red |
+| `pollButton()` | BOOT (GPIO0) | BOOT (GPIO0) |
+
+The UI is split the same way: `ui.cpp` owns every behaviour and only touches
+widgets that the active layout created (all handles in `ui::Widgets` are
+null by default), so a layout can leave out anything that does not fit.
+`ui_layout_wide.cpp` has no toggles or sliders at all — the 1.9 has no touch
+— and shows relay/switch state as text instead; the round layout keeps the
+interactive widgets.
 
 ## Tasks and threading
 
 | Task | Core | Priority | Does |
 |---|---|---|---|
-| `loopTask` (Arduino `loop()`) | 1 | 1 | `lv_timer_handler()`, touch polling, calls `ui::update()` every 250 ms with a fresh snapshot |
+| `loopTask` (Arduino `loop()`) | 1 | 1 | `lv_timer_handler()`, touch polling, BOOT button, serial console, calls `ui::update()` every 250 ms with a fresh snapshot |
 | `batmon_ble` | 0 | 2 | everything NimBLE: scanning, connecting, sequential polling, executing queued commands |
 | NimBLE host task | 0 | — | created by NimBLE-Arduino |
 | `hist_save` | 0 | 1 | copies the history buffers under the lock, then writes `/history.bin` to LittleFS |
@@ -124,7 +158,8 @@ round panel (roughly a 440 px diameter).
 
 | Tile | Contents |
 |---|---|
-| Halo | 270° SoC arc coloured green/amber/red; 72 px SoC digits with a 32 px unit on a shared baseline; **Main** and **Aux** voltages (40 px, 28 px units) side by side; current with charge/discharge arrow (blue = charging, amber = discharging); power; external temperature; time-to-empty/full; large **Switch** output toggle; red **charge-mismatch alert** (aux > 13.0 V while main current < 0.2 A); Bluetooth glyph in the arc's gap, green when connected with fresh data, red otherwise |
+| Halo (round) | 270° SoC arc coloured green/amber/red; 72 px SoC digits with a 32 px unit on a shared baseline; **Main** and **Aux** voltages (40 px, 28 px units) side by side; current with charge/discharge arrow (blue = charging, amber = discharging); power; external temperature; time-to-empty/full; large **Switch** output toggle; red **charge-mismatch alert** (aux > 13.0 V while main current < 0.2 A); Bluetooth glyph in the arc's gap, green when connected with fresh data, red otherwise |
+| Halo (wide) | horizontal SoC **bar** coloured the same way, 28 px SoC %, Main/Aux voltages, current/power/temperature, runtime, "Switch ON/OFF" text, alert line, Bluetooth glyph |
 | Chart | line chart of Main V / Aux V / SoC / Amps (toggle buttons), **Hour / Day / Week / Month** range buttons and ◀ ▶ to scroll one range at a time. Left axis is volts (auto-ranged); right axis is SoC % when SoC is shown, otherwise amps (auto-ranged). When both SoC and amps are on, amps are scaled onto the SoC axis and the scale is printed under the chart |
 | Details | every raw reading, RSSI, poll counters, MAC, time since the last history save; **Relay** and **Switch** toggles |
 | Setup | capacity ±1/±10 Ah, brightness slider, °C/°F, **Pause BLE 5 min / Resume**, **Forget device**, firmware version |
@@ -150,10 +185,18 @@ Cost: every LVGL redraw touches the whole 480 × 480 × 2 B buffer in PSRAM
 
 ### Orientation
 
-`LCD_ROTATE_180` (on by default — the board is mounted USB-up) turns the UI
+On the 2.1, `LCD_ROTATE_180` (on by default — the board is mounted USB-up) turns the UI
 upside down. LVGL's own `sw_rotate` refuses to work with `full_refresh`, so
 `LvglPort::flushCb()` reverses the frame buffer in place (two RGB565 pixels
 per 32-bit word: reverse the words, swap the halves — a few ms in PSRAM)
 before handing it to the RGB driver, and `touchCb()` mirrors both touch
 axes. Doing it in the ST7701 (MADCTL / `0xC7` source-direction registers)
-would be free but is untested on this panel.
+would be free but is untested on this panel. On the 1.9 the same flag is
+implemented in the ST7789's MADCTL (mirror x/y), which costs nothing.
+
+### Input without touch
+
+`ui::nextPage()` and `ui::cycleChartRange()` are driven by the BOOT button
+(short / long press) on every board; the serial console (`src/console.cpp`)
+covers settings, relay/switch, pause/resume and forget, and calls
+`ui::settingsChanged()` so the widgets follow.

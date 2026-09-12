@@ -27,10 +27,18 @@ The project is a [PlatformIO](https://platformio.org/) project using the
 
 ## Build
 
+Two hardware environments, one per board:
+
+| env | board | notes |
+|---|---|---|
+| `waveshare_s3_lcd_2_1` (default) | ESP32-S3-Touch-LCD-2.1, round 480×480, touch | verified on hardware |
+| `waveshare_s3_lcd_1_9` | ESP32-S3-LCD-1.9, landscape 320×170, no touch | builds; not yet run — see [08-hardware-lcd-1-9.md](08-hardware-lcd-1-9.md) |
+
 ```sh
-pio run                      # builds env waveshare_s3_lcd_2_1
-pio run -t upload            # build + flash (auto-detects the port)
-pio device monitor           # 115200 baud, exception decoder enabled
+pio run                                   # builds the default env (2.1)
+pio run -e waveshare_s3_lcd_1_9           # the 1.9
+pio run -e waveshare_s3_lcd_1_9 -t upload # build + flash (auto-detects the port)
+pio device monitor                        # 115200 baud, exception decoder enabled
 ```
 
 First build downloads the toolchain and Arduino core (~1 GB) and takes
@@ -92,6 +100,29 @@ User settings (capacity, preferred device, brightness, units, poll period,
 chart series/range)
 live in NVS and survive re-flashing unless the NVS partition is erased
 (`pio run -t erase`).
+
+## Serial console
+
+The firmware reads commands on the same USB serial port (115200, newline
+terminated). This is the only way to change settings on the touch-less
+1.9; it works on the 2.1 too.
+
+| Command | Effect |
+|---|---|
+| `status` | link state, latest readings, settings, history status |
+| `cap <Ah>` | battery capacity for SoC (0 = unknown) |
+| `bright <0-100>` | backlight |
+| `degf <0\|1>` | temperature units |
+| `poll <ms>` | fast poll period, 250–10000 |
+| `chart <series> <range>` | e.g. `chart main,soc day` — series from main/aux/soc/amps, range hour/day/week/month |
+| `switch on\|off`, `relay on\|off` | BatMon outputs |
+| `pause [minutes]`, `resume` | release the BatMon for the phone app |
+| `forget` | forget the preferred BatMon and rescan |
+| `save` | flush history to flash now |
+| `page` | next page |
+| `help` | list |
+
+`pio device monitor` sends what you type when you press Enter.
 
 ## Serial log
 

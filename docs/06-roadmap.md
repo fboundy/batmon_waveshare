@@ -28,6 +28,7 @@
 - [x] Charge-mismatch alert (aux charging, main not) on the main page
 - [ ] Configurable low-SoC / low-voltage alarm using the onboard buzzer;
       optionally beep on the charge-mismatch alert too
+- [x] Second board: Waveshare ESP32-S3-LCD-1.9 landscape (bar gauge, BOOT button + serial console) - build only, needs hardware test
 - [ ] Multiple BatMon support: swipe between banks (e.g. leisure + starter)
 
 ### Connectivity

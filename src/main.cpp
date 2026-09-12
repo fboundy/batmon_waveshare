@@ -1,73 +1,67 @@
-// BatMon display for the Waveshare ESP32-S3-Touch-LCD-2.1.
+// BatMon display firmware (Waveshare ESP32-S3 boards; see src/boards/).
 //
 // Tasks:
-//   loop()     (core 1)  LVGL rendering + touch, pulls a state snapshot 4x/s
+//   loop()     (core 1)  LVGL rendering + input, pulls a state snapshot 4x/s,
+//                        BOOT button and serial console
 //   batmon_ble (core 0)  NimBLE central: scan / connect / poll the BatMon
+//   hist_save  (core 0)  writes the history buffers to LittleFS
 #include <Arduino.h>
-#include <Wire.h>
 
 #include "batmon/batmon_client.h"
-#include "board/display.h"
-#include "board/lvgl_port.h"
-#include "board/rtc.h"
-#include "board/tca9554.h"
-#include "board/touch.h"
+#include "board/board.h"
 #include "config.h"
+#include "console.h"
 #include "history.h"
 #include "settings.h"
 #include "ui/ui.h"
 
-static board::Tca9554  g_io(TCA9554_ADDR);
-static board::Display  g_display;
-static board::Touch    g_touch;
-static board::LvglPort g_lvgl;
-static board::Rtc      g_rtc;
-
-static bool rtcClock(uint32_t& secs) { return g_rtc.now(secs); }
-
 void setup() {
     Serial.begin(115200);
     delay(200);
-    Serial.printf("\n%s %s\n", FW_NAME, FW_VERSION);
+    Serial.printf("\n%s %s (%s)\n", FW_NAME, FW_VERSION, BOARD_NAME);
 
     g_settings.load();
 
-    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, I2C_FREQ_HZ);
+    if (!board::init()) Serial.println("board init reported an error");
+    board::setBacklight(g_settings.brightness);
 
-    // All expander pins as outputs; buzzer off, resets released.
-    if (!g_io.begin(0x00)) Serial.println("TCA9554 not found!");
-    g_io.setOutput(EXIO_BUZZER, false);
-    g_io.setOutput(EXIO_SD_CS, true);
-
-    if (!g_display.begin(g_io)) Serial.println("Display init failed!");
-    g_display.setBacklight(g_settings.brightness);
-    g_touch.begin(g_io);
-    g_lvgl.begin(g_display, g_touch);
-
-    g_rtc.begin();
     // Before the UI: the chart page reads history at build time.
-    history::begin(rtcClock, !g_rtc.lostContinuity());
+    history::begin(board::clock, board::clockValid());
 
-    if (g_lvgl.lock()) {
-        ui::create(g_display);
-        g_lvgl.unlock();
+    if (board::lvgl().lock()) {
+        ui::create();
+        board::lvgl().unlock();
     }
 
     batmon::g_client.begin();
-    Serial.println("setup done");
+    console::begin();
+    Serial.println("setup done; type 'help' for the console");
 }
 
 void loop() {
     static uint32_t lastUi = 0;
-    g_lvgl.loop();
+    board::LvglPort& lvgl = board::lvgl();
+    lvgl.loop();
+
+    switch (board::pollButton()) {
+        case board::ButtonEvent::Short:
+            if (lvgl.lock(50)) { ui::nextPage(); lvgl.unlock(); }
+            break;
+        case board::ButtonEvent::Long:
+            if (lvgl.lock(50)) { ui::cycleChartRange(); lvgl.unlock(); }
+            break;
+        default:
+            break;
+    }
+    console::poll();
 
     uint32_t now = millis();
     if (now - lastUi >= UI_REFRESH_MS) {
         lastUi = now;
         batmon::State s = batmon::g_client.snapshot();
-        if (g_lvgl.lock(20)) {
+        if (lvgl.lock(20)) {
             ui::update(s);
-            g_lvgl.unlock();
+            lvgl.unlock();
         }
     }
     delay(5);
