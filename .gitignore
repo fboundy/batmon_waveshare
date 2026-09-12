@@ -3,3 +3,9 @@
 *.pyc
 __pycache__/
 .DS_Store
+.dummy/
+sdkconfig.defaults
+sdkconfig.*
+managed_components/
+dependencies.lock
+*firmware.map

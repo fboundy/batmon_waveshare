@@ -18,6 +18,8 @@
 #include "settings.h"
 #include "ui/ui.h"
 
+bool g_screenOn = true;   // read by the console's status command
+
 void setup() {
     Serial.begin(115200);
     delay(200);
@@ -44,6 +46,7 @@ void setup() {
 void loop() {
     static uint32_t lastUi = 0;
     static bool screenOn = true;
+    g_screenOn = screenOn;
     uint32_t now = millis();
     board::LvglPort& lvgl = board::lvgl();
     lvgl.loop();
