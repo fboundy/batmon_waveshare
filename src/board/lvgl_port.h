@@ -47,6 +47,11 @@ public:
     // For async flush drivers (ISR-safe).
     static void flushDone();
 
+    // Direct mode: turn the picture (and touch) 180 degrees in software.
+    // Takes effect on the next full redraw.
+    void setRotate180(bool on);
+    bool rotate180() const { return cfg_.rotate180; }
+
 private:
     static void flushCb(lv_disp_drv_t* drv, const lv_area_t* area, lv_color_t* px);
     static void touchCb(lv_indev_drv_t* drv, lv_indev_data_t* data);

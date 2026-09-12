@@ -34,14 +34,17 @@ static void waitVsync() {
 static bool touchRead(uint16_t& x, uint16_t& y) {
     TouchPoint tp = g_touch.read();
     if (!tp.pressed) return false;
+#if LCD_ROTATE_180_HW
     if (g_display.flipped()) {
         // Panel is flipped in hardware; the touch panel is not.
         x = LCD_H_RES - 1 - tp.x;
         y = LCD_V_RES - 1 - tp.y;
-    } else {
-        x = tp.x;
-        y = tp.y;
+        return true;
     }
+#endif
+    // Software flip: LvglPort mirrors touch itself when rotate180 is on.
+    x = tp.x;
+    y = tp.y;
     return true;
 }
 
@@ -58,7 +61,9 @@ bool init() {
     g_touch.begin(g_io);
     g_rtc.begin();
     g_imu.begin();
+#if LCD_ROTATE_180_HW
     g_display.setFlip(LCD_ROTATE_180);   // until the orientation logic decides
+#endif
     g_button.begin(PIN_BUTTON, BUTTON_LONG_MS);
 
     LvglConfig cfg;
@@ -68,7 +73,7 @@ bool init() {
     cfg.buf0 = g_display.frameBuffer(0);
     cfg.buf1 = g_display.frameBuffer(1);
     cfg.bufPixels = (size_t)LCD_H_RES * LCD_V_RES;
-    cfg.rotate180 = false;   // done in the panel, see Display::setFlip
+    cfg.rotate180 = LCD_ROTATE_180 && !LCD_ROTATE_180_HW;
     cfg.flush = flushFrame;
     cfg.waitVsync = waitVsync;
     cfg.touchRead = touchRead;
@@ -79,8 +84,13 @@ bool init() {
 LvglPort& lvgl() { return g_lvgl; }
 void setBacklight(uint8_t percent) { g_display.setBacklight(percent); }
 void displayResync() { g_display.resync(); }
+#if LCD_ROTATE_180_HW
 void setFlipped(bool f) { if (f != g_display.flipped()) g_display.setFlip(f); }
 bool flipped() { return g_display.flipped(); }
+#else
+void setFlipped(bool f) { g_lvgl.setRotate180(f); }
+bool flipped() { return g_lvgl.rotate180(); }
+#endif
 bool readAccel(float& ax, float& ay, float& az) { return g_imu.read(ax, ay, az); }
 bool clock(uint32_t& secs) { return g_rtc.now(secs); }
 bool clockValid() { return !g_rtc.lostContinuity(); }

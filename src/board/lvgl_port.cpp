@@ -16,7 +16,7 @@ LvglPort* LvglPort::instance_ = nullptr;
 // LVGL refuses sw_rotate in full-refresh mode, so rotate the finished frame
 // ourselves: a 180 degree turn is just reversing the pixel order.  Two
 // RGB565 pixels per 32-bit word -> reverse the words and swap their halves.
-static void rotate180(uint16_t* px, size_t n) {
+static void flipFrame180(uint16_t* px, size_t n) {
     uint32_t* lo = reinterpret_cast<uint32_t*>(px);
     uint32_t* hi = lo + n / 2 - 1;
     while (lo < hi) {
@@ -32,7 +32,7 @@ void LvglPort::flushCb(lv_disp_drv_t* drv, const lv_area_t* area, lv_color_t* px
     if (c.direct) {
         // full_refresh guarantees the whole frame is redrawn every time, so an
         // in-place rotation of the buffer we were just handed is safe.
-        if (c.rotate180) rotate180(reinterpret_cast<uint16_t*>(px), (size_t)c.width * c.height);
+        if (c.rotate180) flipFrame180(reinterpret_cast<uint16_t*>(px), (size_t)c.width * c.height);
         c.flush(0, 0, c.width - 1, c.height - 1, px);
         if (c.waitVsync) c.waitVsync();
     } else {
@@ -101,6 +101,15 @@ bool LvglPort::begin(const LvglConfig& cfg) {
     if (esp_timer_create(&args, &t) != ESP_OK) return false;
     esp_timer_start_periodic(t, LVGL_TICK_MS * 1000);
     return true;
+}
+
+void LvglPort::setRotate180(bool on) {
+    if (cfg_.rotate180 == on) return;
+    cfg_.rotate180 = on;
+    if (lock(100)) {
+        lv_obj_invalidate(lv_scr_act());
+        unlock();
+    }
 }
 
 void LvglPort::loop() {
