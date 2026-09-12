@@ -9,6 +9,9 @@
 #include "../settings.h"
 #include "ui_internal.h"
 
+LV_FONT_DECLARE(lv_font_icons_24)               // src/ui/font_icons_24.c: mobile phone glyph
+#define SYMBOL_MOBILE "\xEF\x8F\x8D"             // U+F3CD
+
 namespace ui {
 namespace layout {
 
@@ -27,13 +30,17 @@ void halo(lv_obj_t* page) {
     lv_obj_set_pos(w.lblName, 8, 4);
     lv_label_set_text(w.lblName, "BatMon");
 
-    // Status icons top right: charge state, Bluetooth link
+    // Status icons top right: phone presence, charge state, Bluetooth link
     w.lblBt = mkLabel(page, &lv_font_montserrat_24, col::bad());
     lv_label_set_text(w.lblBt, LV_SYMBOL_BLUETOOTH);
     lv_obj_align(w.lblBt, LV_ALIGN_TOP_RIGHT, -8, 0);
     w.lblCharge = mkLabel(page, &lv_font_montserrat_24, col::dim());
     lv_label_set_text(w.lblCharge, LV_SYMBOL_CHARGE);
     lv_obj_align(w.lblCharge, LV_ALIGN_TOP_RIGHT, -40, 0);
+    w.lblPhoneIcon = mkLabel(page, &lv_font_icons_24, col::bad());
+    lv_label_set_text(w.lblPhoneIcon, SYMBOL_MOBILE);
+    lv_obj_align(w.lblPhoneIcon, LV_ALIGN_TOP_RIGHT, -68, 0);
+    lv_obj_add_flag(w.lblPhoneIcon, LV_OBJ_FLAG_HIDDEN);
 
     // SoC bar: 8..232, with the percentage to its right
     w.bar = lv_bar_create(page);
@@ -86,14 +93,9 @@ void halo(lv_obj_t* page) {
     lv_obj_align(w.lblRelayState, LV_ALIGN_TOP_RIGHT, -8, 126);
     lv_label_set_text(w.lblRelayState, "Relay --");
 
-    // Phone presence: glyph + name in the middle of the bottom row
-    lv_obj_t* rowPh = mkRow(page, 4);
-    lv_obj_set_flex_align(rowPh, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_align(rowPh, LV_ALIGN_TOP_MID, 10, 124);
-    w.lblPhoneIcon = mkLabel(rowPh, &lv_font_montserrat_16, col::bad());
-    lv_label_set_text(w.lblPhoneIcon, LV_SYMBOL_CALL);
-    lv_obj_add_flag(w.lblPhoneIcon, LV_OBJ_FLAG_HIDDEN);
-    w.lblPhoneName = mkLabel(rowPh, &lv_font_montserrat_12, col::dim());
+    // Phone name in the middle of the bottom row (icon is top right)
+    w.lblPhoneName = mkLabel(page, &lv_font_montserrat_12, col::dim());
+    lv_obj_align(w.lblPhoneName, LV_ALIGN_TOP_MID, 10, 128);
     lv_obj_add_flag(w.lblPhoneName, LV_OBJ_FLAG_HIDDEN);
 
 }
@@ -174,13 +176,16 @@ void phones(lv_obj_t* page) {
     lv_label_set_long_mode(w.lblPhones, LV_LABEL_LONG_WRAP);
     lv_obj_set_pos(w.lblPhones, 8, 22);
 
+    w.lblTimeout = mkLabel(page, &lv_font_montserrat_12, col::text());
+    lv_obj_align(w.lblTimeout, LV_ALIGN_TOP_RIGHT, -8, 4);
+
     w.lblPairStatus = mkLabel(page, &lv_font_montserrat_12, col::dim());
     lv_obj_set_width(w.lblPairStatus, LCD_H_RES - 16);
     lv_label_set_long_mode(w.lblPairStatus, LV_LABEL_LONG_WRAP);
     lv_obj_align(w.lblPairStatus, LV_ALIGN_BOTTOM_LEFT, 8, -20);
 
     lv_obj_t* help = mkLabel(page, &lv_font_montserrat_12, col::stale());
-    lv_label_set_text(help, "serial: phone pair | phone forget <n>|all | phone name <n> <name>");
+    lv_label_set_text(help, "serial: phone pair | forget <n>|all | name <n> <name> | timeout <s>");
     lv_obj_align(help, LV_ALIGN_BOTTOM_LEFT, 8, -4);
 }
 

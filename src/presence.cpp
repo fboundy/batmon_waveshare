@@ -193,7 +193,7 @@ bool anyPaired() { return nPhones > 0; }
 bool present(int i) {
     if (i < 0 || i >= nPhones) return false;
     uint32_t seen = phones[i].lastSeenMs;
-    return seen != 0 && (millis() - seen) < PRESENCE_TIMEOUT_MS;
+    return seen != 0 && (millis() - seen) < (uint32_t)g_settings.presenceTimeoutS * 1000UL;
 }
 
 bool anyPresent() {

@@ -19,6 +19,7 @@ void Settings::load() {
     chartMask      = p.getUChar("cmask", chartMask);
     chartRange     = p.getUChar("crange", chartRange);
     relayFollowsPhone = p.getBool("relayph", relayFollowsPhone);
+    presenceTimeoutS = p.getUShort("phto", presenceTimeoutS);
     p.end();
 }
 
@@ -34,6 +35,7 @@ void Settings::save() const {
     p.putUChar("cmask", chartMask);
     p.putUChar("crange", chartRange);
     p.putBool("relayph", relayFollowsPhone);
+    p.putUShort("phto", presenceTimeoutS);
     p.end();
 }
 

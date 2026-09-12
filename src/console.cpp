@@ -37,6 +37,7 @@ static void help() {
         "  phone pair             open a 2 min pairing window (advertises 'BatMon Display')\n"
         "  phone forget <n|all>\n"
         "  phone name <n> <name>\n"
+        "  phone timeout <s>      away after this many seconds without an advert (15-600)\n"
         "  relayphone <0|1>       relay on when a phone arrives, off when the last leaves\n"
         "  help");
 }
@@ -173,12 +174,20 @@ static void execute(char* l) {
             if (!strcasecmp(a2, "all")) presence::forgetAll();
             else presence::forget(atoi(a2));
             phoneList();
+        } else if (!strcasecmp(a1, "timeout") && a2) {
+            int v = atoi(a2);
+            if (v < PRESENCE_TIMEOUT_MIN_S) v = PRESENCE_TIMEOUT_MIN_S;
+            if (v > PRESENCE_TIMEOUT_MAX_S) v = PRESENCE_TIMEOUT_MAX_S;
+            g_settings.presenceTimeoutS = v;
+            g_settings.save();
+            uiChanged();
+            Serial.printf("presence timeout %d s\n", v);
         } else if (!strcasecmp(a1, "name") && a2) {
             char* nm = strtok(nullptr, "");
             if (presence::rename(atoi(a2), nm)) phoneList();
             else Serial.println("usage: phone name <n> <name>");
         } else {
-            Serial.println("usage: phone list|pair|stop|forget <n|all>|name <n> <name>");
+            Serial.println("usage: phone list|pair|stop|forget <n|all>|name <n> <name>|timeout <s>");
         }
     } else if (!strcasecmp(cmd, "relayphone") && onOff(a1, on)) {
         g_settings.relayFollowsPhone = on;

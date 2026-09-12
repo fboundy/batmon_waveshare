@@ -234,6 +234,23 @@ void onDeletePhone(lv_event_t*) {
     applyPhoneSelection();
 }
 
+void setTimeoutLabel() {
+    if (!w.lblTimeout) return;
+    char buf[32];
+    snprintf(buf, sizeof buf, "Away after %u s", g_settings.presenceTimeoutS);
+    lv_label_set_text(w.lblTimeout, buf);
+}
+
+void onTimeout(lv_event_t* e) {
+    int delta = (int)(intptr_t)lv_event_get_user_data(e);
+    int v = (int)g_settings.presenceTimeoutS + delta;
+    if (v < PRESENCE_TIMEOUT_MIN_S) v = PRESENCE_TIMEOUT_MIN_S;
+    if (v > PRESENCE_TIMEOUT_MAX_S) v = PRESENCE_TIMEOUT_MAX_S;
+    g_settings.presenceTimeoutS = v;
+    g_settings.save();
+    setTimeoutLabel();
+}
+
 void onNameKeyboard(lv_event_t* e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_READY && namingPhone >= 0) {
@@ -435,6 +452,7 @@ void cycleChartRange() {
 
 void settingsChanged() {
     setCapacityLabel();
+    setTimeoutLabel();
     if (w.swRelayPhone) {
         if (g_settings.relayFollowsPhone) lv_obj_add_state(w.swRelayPhone, LV_STATE_CHECKED);
         else lv_obj_clear_state(w.swRelayPhone, LV_STATE_CHECKED);
@@ -495,6 +513,7 @@ void create() {
     applyRangeButtons();
     applySeriesButtons();
     setCapacityLabel();
+    setTimeoutLabel();
     rebuildChart();
 }
 

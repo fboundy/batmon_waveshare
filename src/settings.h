@@ -19,6 +19,8 @@ struct Settings {
     uint8_t chartRange = 0;
     // Relay on when a paired phone arrives, off when the last one leaves.
     bool relayFollowsPhone = false;
+    // A phone counts as present this long after its last advertisement.
+    uint16_t presenceTimeoutS = 90;
 
     void load();
     void save() const;
