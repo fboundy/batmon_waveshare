@@ -138,7 +138,7 @@ void onSwitchSwitch(lv_event_t* e) {
 
 void onSwitchRelay(lv_event_t* e) {
     if (suppressSwitchEvents) return;
-    if (g_settings.relayFollowsPhone && presence::anyPaired() && !presence::anyPresent()) return;   // locked
+    if (g_settings.relayFollowsPhone && !presence::anyPresent()) return;   // relay is the phone's, not the user's
     bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
     switchHoldUntilMs = millis() + SWITCH_HOLD_MS;
     batmon::g_client.requestSetIo(batmon::IoType::Relay, on);
@@ -716,15 +716,15 @@ void update(const State& s) {
         setText(w.lblIoState, buf);
     }
 
-    // With "relay follows phone" on, relay control is locked while phones are
-    // paired but none is present (screen woken by touch/BOOT in standby):
-    // nobody without a paired phone gets to switch the relay.
-    bool relayLocked = g_settings.relayFollowsPhone && presence::anyPaired() && !presence::anyPresent();
-    for (lv_obj_t* o : {w.swRelay, w.swHaloRelay}) {
-        if (!o) continue;
-        if (relayLocked != lv_obj_has_state(o, LV_STATE_DISABLED)) {
-            if (relayLocked) lv_obj_add_state(o, LV_STATE_DISABLED); else lv_obj_clear_state(o, LV_STATE_DISABLED);
-        }
+    // With "relay follows phone" on, the relay belongs to the phone: while no
+    // paired phone is present the toggle is removed from the Halo page
+    // (greyed out on Details), so nobody without a phone can switch it.
+    bool relayLocked = g_settings.relayFollowsPhone && !presence::anyPresent();
+    // Halo page: the relay row disappears entirely; Details page: greyed out.
+    setHidden(w.rowHaloRelay, relayLocked);
+    setHidden(w.lblRelayState, relayLocked);
+    if (w.swRelay && relayLocked != lv_obj_has_state(w.swRelay, LV_STATE_DISABLED)) {
+        if (relayLocked) lv_obj_add_state(w.swRelay, LV_STATE_DISABLED); else lv_obj_clear_state(w.swRelay, LV_STATE_DISABLED);
     }
 
     // Reflect the device's real pin state without firing our own handlers.

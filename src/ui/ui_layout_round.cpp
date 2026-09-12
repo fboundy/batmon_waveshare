@@ -90,6 +90,7 @@ void halo(lv_obj_t* page) {
     lv_obj_t* rowSw = mkRow(page, 14);
     lv_obj_set_flex_align(rowSw, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_align(rowSw, LV_ALIGN_CENTER, 0, 124);
+    w.rowHaloRelay = rowSw;
     lv_obj_t* capSw = mkLabel(rowSw, &lv_font_montserrat_20, col::dim());
     lv_label_set_text(capSw, "Relay");
     w.swHaloRelay = lv_switch_create(rowSw);
