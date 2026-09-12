@@ -13,6 +13,7 @@ enum class LinkState : uint8_t {
     Connected,
     Reconnecting,   // lost link, backing off before rescan
     Paused,         // user asked us to release the BatMon (phone app)
+    Standby,        // no paired phone present: link released, screen off
 };
 
 const char* linkStateName(LinkState s);

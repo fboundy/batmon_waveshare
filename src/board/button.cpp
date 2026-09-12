@@ -5,6 +5,10 @@
 namespace board {
 
 static constexpr uint32_t DEBOUNCE_MS = 30;
+static uint32_t s_lastInputMs = 0;
+
+uint32_t lastInputMs() { return s_lastInputMs; }
+void noteInput() { s_lastInputMs = millis(); }
 
 void Button::begin(int pin, uint32_t longMs) {
     pin_ = pin;
@@ -22,6 +26,7 @@ ButtonEvent Button::poll() {
         lastChangeMs_ = now;
         down_ = pressed;
         if (pressed) {
+            noteInput();
             downMs_ = now;
             longFired_ = false;
         } else if (!longFired_) {

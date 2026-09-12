@@ -18,6 +18,7 @@ void Settings::load() {
     pollMs         = p.getUShort("poll", pollMs);
     chartMask      = p.getUChar("cmask", chartMask);
     chartRange     = p.getUChar("crange", chartRange);
+    relayFollowsPhone = p.getBool("relayph", relayFollowsPhone);
     p.end();
 }
 
@@ -32,6 +33,7 @@ void Settings::save() const {
     p.putUShort("poll", pollMs);
     p.putUChar("cmask", chartMask);
     p.putUChar("crange", chartRange);
+    p.putBool("relayph", relayFollowsPhone);
     p.end();
 }
 

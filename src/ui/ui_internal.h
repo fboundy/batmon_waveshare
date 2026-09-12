@@ -68,7 +68,12 @@ struct Widgets {
     lv_obj_t* btnRange[4] = {};
     lv_obj_t* lblWindow = nullptr;
     lv_obj_t* lblScale = nullptr;
+    // Phones
+    lv_obj_t* lblPhones = nullptr;       // multi-line list
+    lv_obj_t* lblPairStatus = nullptr;
+    lv_obj_t* btnPairLbl = nullptr;      // label inside the Pair button
     // Setup
+    lv_obj_t* swRelayPhone = nullptr;
     lv_obj_t* lblCapacity = nullptr;
     lv_obj_t* sliderBright = nullptr;
     lv_obj_t* swFahrenheit = nullptr;
@@ -100,12 +105,16 @@ void onBrightness(lv_event_t* e);
 void onFahrenheit(lv_event_t* e);
 void onPause(lv_event_t* e);
 void onForget(lv_event_t* e);
+void onPairPhone(lv_event_t* e);      // start / stop the pairing window
+void onForgetPhones(lv_event_t* e);
+void onRelayPhone(lv_event_t* e);
 
 // ---- layout entry points (one .cpp per form factor) -----------------------------
 namespace layout {
 void halo(lv_obj_t* page);
 void chart(lv_obj_t* page);
 void detail(lv_obj_t* page);
+void phones(lv_obj_t* page);
 void setup(lv_obj_t* page);
 }  // namespace layout
 

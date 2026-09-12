@@ -12,7 +12,7 @@
 
 namespace batmon {
 
-class Client : public NimBLEClientCallbacks {
+class Client : public NimBLEClientCallbacks, public NimBLEScanCallbacks {
 public:
     void begin();
 
@@ -44,7 +44,10 @@ private:
     static void taskEntry(void* arg);
     void task();
 
-    bool scanAndPick(NimBLEAddress& addr, std::string& name, int& rssi);
+    // One continuous scan feeds BatMon discovery and phone presence.
+    void startScan();
+    void stopScan();
+    bool takeCandidate(NimBLEAddress& addr, std::string& name, int& rssi);
     bool connectTo(const NimBLEAddress& addr);
     void disconnect();
     bool findCharacteristics();
@@ -61,6 +64,20 @@ private:
     // NimBLEClientCallbacks
     void onConnect(NimBLEClient* c) override;
     void onDisconnect(NimBLEClient* c, int reason) override;
+    // NimBLEScanCallbacks
+    void onResult(const NimBLEAdvertisedDevice* dev) override;
+    void onScanEnd(const NimBLEScanResults& results, int reason) override;
+
+    struct Candidate {
+        bool valid = false;
+        NimBLEAddress addr;
+        std::string name;
+        int rssi = -127;
+        uint32_t seenMs = 0;
+    };
+    Candidate cand_;
+    void* candMutex_ = nullptr;   // SemaphoreHandle_t
+    bool scanning_ = false;
 
     NimBLEClient* client_ = nullptr;
     NimBLERemoteCharacteristic* chrSensor_ = nullptr;

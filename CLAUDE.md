@@ -35,6 +35,8 @@ Windows gotchas (both cost real time the first session):
 - `src/ui/ui.cpp` — all page behaviour; `ui_layout_round.cpp` / `ui_layout_wide.cpp` only build widgets into
   `ui::Widgets w`. update() null-checks every handle, so a layout may omit widgets. Only the loop task touches LVGL.
 - `src/console.cpp` — serial commands; the only settings input on the touch-less 1.9.
+- `src/presence.*` (branch feature/phone-presence) — phone bonding + RPA presence + standby gate.
+  The BLE client's scan is continuous and callback-driven; presence and BatMon discovery share it.
 - `src/history.*` — PSRAM ring buffers behind the chart page; fed from the BLE task; saved to
   LittleFS `/history.bin` every 5 min by its own task; RTC (`src/board/rtc.*`) sizes the reboot gap.
 - `LCD_ROTATE_180` in `config.h`: software flip in `LvglPort::flushCb` + mirrored touch.

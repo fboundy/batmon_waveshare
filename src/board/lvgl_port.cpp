@@ -6,6 +6,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
+#include "board.h"
+
 namespace board {
 
 static constexpr uint32_t LVGL_TICK_MS = 2;
@@ -46,6 +48,7 @@ void LvglPort::touchCb(lv_indev_drv_t* drv, lv_indev_data_t* data) {
     LvglPort* self = static_cast<LvglPort*>(drv->user_data);
     uint16_t x, y;
     if (self->cfg_.touchRead && self->cfg_.touchRead(x, y)) {
+        noteInput();
         if (self->cfg_.rotate180) {
             x = self->cfg_.width - 1 - x;
             y = self->cfg_.height - 1 - y;

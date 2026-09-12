@@ -12,6 +12,7 @@
 #include "config.h"
 #include "console.h"
 #include "history.h"
+#include "presence.h"
 #include "settings.h"
 #include "ui/ui.h"
 
@@ -40,8 +41,18 @@ void setup() {
 
 void loop() {
     static uint32_t lastUi = 0;
+    static bool screenOn = true;
     board::LvglPort& lvgl = board::lvgl();
     lvgl.loop();
+
+    presence::tick();
+    // Standby: paired phones exist but none is here.  Screen off unless
+    // someone touched it / pressed the button recently.
+    bool wantOn = presence::gateOpen() || (millis() - board::lastInputMs() < WAKE_MS);
+    if (wantOn != screenOn) {
+        screenOn = wantOn;
+        board::setBacklight(screenOn ? g_settings.brightness : 0);
+    }
 
     switch (board::pollButton()) {
         case board::ButtonEvent::Short:

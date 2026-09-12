@@ -17,6 +17,8 @@ struct Settings {
     // Chart page: bit0 main V, bit1 aux V, bit2 SoC, bit3 current; range 0..3
     uint8_t chartMask = 0x01;
     uint8_t chartRange = 0;
+    // Relay on when a paired phone arrives, off when the last one leaves.
+    bool relayFollowsPhone = false;
 
     void load();
     void save() const;

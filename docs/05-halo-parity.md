@@ -42,6 +42,8 @@ Already implemented:
   BatMon CPU temperature, RSSI, poll statistics, MAC address.
 * **Relay and switch control** from the display (the HA switch entities).
 * **Time to empty / time to full** from the present current.
+* **Phone presence**: pair your phone(s) once and the display (and the
+  BatMon link) only run while one is nearby; optionally the relay follows.
 * **Pause BLE** button so the phone app can connect without power-cycling
   the display.
 * **Forget device** to re-pair with a different BatMon.

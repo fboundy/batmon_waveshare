@@ -10,6 +10,7 @@
 | [06-roadmap.md](06-roadmap.md) | Open questions that need a real BatMon, planned features |
 | [07-session-log.md](07-session-log.md) | What has been done, decided and verified so far; next steps (read this first when picking the project up) |
 | [08-hardware-lcd-1-9.md](08-hardware-lcd-1-9.md) | Second target: Waveshare ESP32-S3-LCD-1.9 (landscape, no touch) — pins, panel driving, button/serial input, first-run checklist |
+| [09-phone-presence.md](09-phone-presence.md) | Phone pairing / presence: bonding, RPA resolution, standby gate, relay-follow; pairing walkthrough and verification checklist |
 
 ## Sources
 

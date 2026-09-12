@@ -29,4 +29,8 @@ void setStatusLed(uint8_t r, uint8_t g, uint8_t b);
 enum class ButtonEvent : uint8_t { None, Short, Long };
 ButtonEvent pollButton();
 
+// millis() of the last touch or button press (for waking from standby).
+uint32_t lastInputMs();
+void noteInput();
+
 }  // namespace board

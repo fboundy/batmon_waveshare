@@ -152,7 +152,30 @@ void detail(lv_obj_t* page) {
 }
 
 // ---------------------------------------------------------------------------
-// Page 3: Setup  (read-only summary; changes come from the serial console)
+// Page 3: Phones  (list + status; pairing is started from the serial console)
+// ---------------------------------------------------------------------------
+void phones(lv_obj_t* page) {
+    lv_obj_t* title = mkLabel(page, &lv_font_montserrat_14, col::accent());
+    lv_obj_set_pos(title, 8, 2);
+    lv_label_set_text(title, "Phones");
+
+    w.lblPhones = mkLabel(page, &lv_font_montserrat_14, col::text());
+    lv_obj_set_width(w.lblPhones, LCD_H_RES - 16);
+    lv_label_set_long_mode(w.lblPhones, LV_LABEL_LONG_WRAP);
+    lv_obj_set_pos(w.lblPhones, 8, 22);
+
+    w.lblPairStatus = mkLabel(page, &lv_font_montserrat_12, col::dim());
+    lv_obj_set_width(w.lblPairStatus, LCD_H_RES - 16);
+    lv_label_set_long_mode(w.lblPairStatus, LV_LABEL_LONG_WRAP);
+    lv_obj_align(w.lblPairStatus, LV_ALIGN_BOTTOM_LEFT, 8, -20);
+
+    lv_obj_t* help = mkLabel(page, &lv_font_montserrat_12, col::stale());
+    lv_label_set_text(help, "serial: phone pair | phone forget <n>|all | phone name <n> <name>");
+    lv_obj_align(help, LV_ALIGN_BOTTOM_LEFT, 8, -4);
+}
+
+// ---------------------------------------------------------------------------
+// Page 4: Setup  (read-only summary; changes come from the serial console)
 // ---------------------------------------------------------------------------
 void setup(lv_obj_t* page) {
     lv_obj_t* title = mkLabel(page, &lv_font_montserrat_14, col::accent());
@@ -173,7 +196,8 @@ void setup(lv_obj_t* page) {
         "USB serial 115200, type 'help':\n"
         "cap <Ah>  bright <0-100>  degf 0|1  poll <ms>\n"
         "switch on|off  relay on|off  pause  resume  forget\n"
-        "chart <main,aux,soc,amps> <hour|day|week|month>");
+        "chart <main,aux,soc,amps> <hour|day|week|month>\n"
+        "relayphone 0|1  phone pair|list|forget|name");
 
     lv_obj_t* ver = mkLabel(page, &lv_font_montserrat_12, col::stale());
     lv_label_set_text(ver, FW_NAME " " FW_VERSION "  " BOARD_NAME);

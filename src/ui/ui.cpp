@@ -9,6 +9,7 @@
 #include "../board/board.h"
 #include "../config.h"
 #include "../history.h"
+#include "../presence.h"
 #include "../settings.h"
 #include "ui_internal.h"
 
@@ -18,13 +19,15 @@ using batmon::State;
 namespace ui {
 
 Widgets w;
+static constexpr size_t MAX_PHONE_LIST = 256;
 
 const char* const detailNames[D_COUNT] = {
     "Main voltage", "Aux voltage", "Current", "Power", "Amp hours", "Ah full ref",
     "Ah min", "Ext temp", "CPU temp", "RSSI", "Polls ok/err", "Address", "History saved"};
 
 static lv_obj_t* tv = nullptr;
-static lv_obj_t* pages[4] = {};
+static constexpr int NPAGES = 5;
+static lv_obj_t* pages[NPAGES] = {};
 static constexpr int PAGE_CHART = 1;
 
 // After a user toggle, stop syncing the switches from device state for a
@@ -169,6 +172,20 @@ void onPause(lv_event_t*) {
 
 void onForget(lv_event_t*) {
     batmon::g_client.forgetDevice();
+}
+
+void onPairPhone(lv_event_t*) {
+    if (presence::pairing()) presence::stopPairing();
+    else presence::startPairing(PAIRING_WINDOW_MS);
+}
+
+void onForgetPhones(lv_event_t*) {
+    presence::forgetAll();
+}
+
+void onRelayPhone(lv_event_t* e) {
+    g_settings.relayFollowsPhone = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+    g_settings.save();
 }
 
 // ---------------------------------------------------------------------------
@@ -360,6 +377,10 @@ void cycleChartRange() {
 
 void settingsChanged() {
     setCapacityLabel();
+    if (w.swRelayPhone) {
+        if (g_settings.relayFollowsPhone) lv_obj_add_state(w.swRelayPhone, LV_STATE_CHECKED);
+        else lv_obj_clear_state(w.swRelayPhone, LV_STATE_CHECKED);
+    }
     if (w.sliderBright) lv_slider_set_value(w.sliderBright, g_settings.brightness, LV_ANIM_OFF);
     if (w.swFahrenheit) {
         if (g_settings.fahrenheit) lv_obj_add_state(w.swFahrenheit, LV_STATE_CHECKED);
@@ -382,8 +403,8 @@ static void onTileChanged(lv_event_t*) {
 void nextPage() {
     lv_obj_t* act = lv_tileview_get_tile_act(tv);
     int i = 0;
-    for (; i < 4; i++) if (pages[i] == act) break;
-    i = (i + 1) % 4;
+    for (; i < NPAGES; i++) if (pages[i] == act) break;
+    i = (i + 1) % NPAGES;
     lv_obj_set_tile(tv, pages[i], LV_ANIM_ON);
     chartVisible = (i == PAGE_CHART);
     if (chartVisible) rebuildChart();
@@ -398,9 +419,9 @@ void create() {
     lv_obj_set_scrollbar_mode(tv, LV_SCROLLBAR_MODE_OFF);
 
     pages[0] = lv_tileview_add_tile(tv, 0, 0, LV_DIR_RIGHT);
-    pages[1] = lv_tileview_add_tile(tv, 1, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
-    pages[2] = lv_tileview_add_tile(tv, 2, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
-    pages[3] = lv_tileview_add_tile(tv, 3, 0, LV_DIR_LEFT);
+    for (int i = 1; i < NPAGES - 1; i++)
+        pages[i] = lv_tileview_add_tile(tv, i, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
+    pages[NPAGES - 1] = lv_tileview_add_tile(tv, NPAGES - 1, 0, LV_DIR_LEFT);
     for (lv_obj_t* p : pages) {
         lv_obj_set_style_bg_color(p, col::bg(), 0);
         lv_obj_clear_flag(p, LV_OBJ_FLAG_SCROLLABLE);
@@ -410,7 +431,8 @@ void create() {
     layout::halo(pages[0]);
     layout::chart(pages[1]);
     layout::detail(pages[2]);
-    layout::setup(pages[3]);
+    layout::phones(pages[3]);
+    layout::setup(pages[4]);
 
     applyRangeButtons();
     applySeriesButtons();
@@ -425,7 +447,7 @@ static void setText(lv_obj_t* o, const char* t) { if (o) lv_label_set_text(o, t)
 static void setColor(lv_obj_t* o, lv_color_t c) { if (o) lv_obj_set_style_text_color(o, c, 0); }
 
 void update(const State& s) {
-    char buf[80];
+    char buf[160];
 
     // ---- Halo page ----
     setText(w.lblName, s.deviceName[0] ? s.deviceName : "BatMon");
@@ -519,7 +541,9 @@ void update(const State& s) {
     setColor(w.lblBt, linked ? col::good() : col::bad());
     if (linked) board::setStatusLed(0, 255, 0);
     else if (s.link == LinkState::Paused) board::setStatusLed(0, 0, 255);
+    else if (s.link == LinkState::Standby) board::setStatusLed(0, 0, 0);
     else board::setStatusLed(255, 0, 0);
+    if (s.link == LinkState::Standby) setText(w.lblRuntime, "Standby: no phone present");
 
     bool relayOn = s.relay.valid() && s.relay.value > 0.5f;
     bool swOn = s.sw.valid() && s.sw.value > 0.5f;
@@ -585,14 +609,52 @@ void update(const State& s) {
     // ---- Chart page ----
     if (chartVisible && millis() - lastChartMs >= CHART_REFRESH_MS) rebuildChart();
 
+    // ---- Phones page ----
+    if (w.lblPhones) {
+        char list[MAX_PHONE_LIST];
+        int n = presence::count();
+        if (n == 0) {
+            snprintf(list, sizeof list, "No phones paired.\nThe display works normally.");
+        } else {
+            size_t used = 0;
+            for (int i = 0; i < n && used < sizeof list - 1; i++) {
+                const presence::Phone& p = presence::phone(i);
+                bool here = presence::present(i);
+                int wrote;
+                if (here)
+                    wrote = snprintf(list + used, sizeof list - used, "%s%s  %d dBm", used ? "\n" : "",
+                                     p.name, p.rssi);
+                else
+                    wrote = snprintf(list + used, sizeof list - used, "%s%s  away", used ? "\n" : "", p.name);
+                if (wrote > 0) used += wrote;
+            }
+        }
+        lv_label_set_text(w.lblPhones, list);
+    }
+    if (w.lblPairStatus) {
+        if (presence::pairing()) {
+            uint32_t left = presence::pairingRemainingMs() / 1000;
+            snprintf(buf, sizeof buf, "Pairing: %lu:%02lu left. On the phone open nRF Connect,\n"
+                     "connect to 'BatMon Display' and read the characteristic.",
+                     (unsigned long)left / 60, (unsigned long)left % 60);
+        } else {
+            snprintf(buf, sizeof buf, "%s", presence::anyPaired()
+                     ? "Screen and BatMon link stay off until a paired phone is near."
+                     : "Pair a phone to make the display follow it.");
+        }
+        lv_label_set_text(w.lblPairStatus, buf);
+    }
+    setText(w.btnPairLbl, presence::pairing() ? "Stop pairing" : "Pair new phone");
+
     // ---- Setup page ----
     setText(w.btnPauseLbl, s.link == LinkState::Paused ? "Resume BLE" : "Pause BLE 5 min");
     if (w.lblSetupInfo) {
         char cap[24];
         if (g_settings.capacityAh > 0) snprintf(cap, sizeof cap, "%.0f Ah", g_settings.capacityAh);
         else snprintf(cap, sizeof cap, "not set");
-        snprintf(buf, sizeof buf, "Capacity %s   Bright %u%%   %s   Poll %u ms",
-                 cap, g_settings.brightness, g_settings.fahrenheit ? "F" : "C", g_settings.pollMs);
+        snprintf(buf, sizeof buf, "Capacity %s   Bright %u%%   %s   Poll %u ms   Relay follows phone: %s",
+                 cap, g_settings.brightness, g_settings.fahrenheit ? "F" : "C", g_settings.pollMs,
+                 g_settings.relayFollowsPhone ? "on" : "off");
         lv_label_set_text(w.lblSetupInfo, buf);
     }
 }

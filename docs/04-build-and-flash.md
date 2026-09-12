@@ -87,6 +87,11 @@ All tunables are in `src/config.h`:
 | `CHART_REFRESH_MS` | 5000 | how often the chart page redraws while visible |
 | `HISTORY_SAVE_MS` | 300000 | how often the history buffers are written to LittleFS |
 | `LCD_ROTATE_180` | 1 | rotate UI and touch by 180° (board mounted USB-up) |
+| `PRESENCE_TIMEOUT_MS` | 90000 | a phone counts as present this long after its last advert |
+| `BOOT_GRACE_MS` | 60000 | gate open after boot regardless of phones |
+| `LEAVE_HOLD_MS` | 5000 | BatMon link kept this long after the last phone leaves (relay-off goes out first) |
+| `WAKE_MS` | 30000 | touch/button wakes a standby screen for this long |
+| `PAIRING_WINDOW_MS` | 120000 | how long "Pair new phone" advertises |
 | `CHG_AUX_CHARGING_V` | 13.2 | aux voltage above which a charger is considered running |
 | `CHG_MAIN_CURRENT_A` | 0.05 | main current above which the main is charging |
 | `CHG_FULL_SOC` / `CHG_FULL_MAIN_V` | 95 % / 14.4 V | main considered full (charge icon yellow instead of red) |
@@ -121,6 +126,8 @@ terminated). This is the only way to change settings on the touch-less
 | `forget` | forget the preferred BatMon and rescan |
 | `save` | flush history to flash now |
 | `page` | next page |
+| `phone list` / `phone pair` / `phone stop` / `phone forget <n\|all>` / `phone name <n> <name>` | phone presence, see [09-phone-presence.md](09-phone-presence.md) |
+| `relayphone 0\|1` | relay follows phone presence |
 | `help` | list |
 
 `pio device monitor` sends what you type when you press Enter.

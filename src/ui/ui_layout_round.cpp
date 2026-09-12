@@ -183,7 +183,35 @@ void detail(lv_obj_t* page) {
 }
 
 // ---------------------------------------------------------------------------
-// Page 3: Setup
+// Page 3: Phones
+// ---------------------------------------------------------------------------
+void phones(lv_obj_t* page) {
+    lv_obj_t* title = mkLabel(page, &lv_font_montserrat_20, col::accent());
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 46);
+    lv_label_set_text(title, "Phones");
+
+    w.lblPhones = mkLabel(page, &lv_font_montserrat_18, col::text());
+    lv_obj_set_width(w.lblPhones, 300);
+    lv_obj_set_style_text_align(w.lblPhones, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(w.lblPhones, LV_LABEL_LONG_WRAP);
+    lv_obj_align(w.lblPhones, LV_ALIGN_TOP_MID, 0, 84);
+
+    lv_obj_t* bp = mkButton(page, "Pair new phone", 220, 44, onPairPhone, nullptr);
+    lv_obj_align(bp, LV_ALIGN_CENTER, 0, 30);
+    w.btnPairLbl = lv_obj_get_child(bp, 0);
+
+    w.lblPairStatus = mkLabel(page, &lv_font_montserrat_14, col::dim());
+    lv_obj_set_width(w.lblPairStatus, 340);
+    lv_obj_set_style_text_align(w.lblPairStatus, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(w.lblPairStatus, LV_LABEL_LONG_WRAP);
+    lv_obj_align(w.lblPairStatus, LV_ALIGN_CENTER, 0, 88);
+
+    lv_obj_t* bf = mkButton(page, "Forget all phones", 220, 40, onForgetPhones, nullptr);
+    lv_obj_align(bf, LV_ALIGN_CENTER, 0, 150);
+}
+
+// ---------------------------------------------------------------------------
+// Page 4: Setup
 // ---------------------------------------------------------------------------
 void setup(lv_obj_t* page) {
     lv_obj_t* title = mkLabel(page, &lv_font_montserrat_20, col::accent());
@@ -220,14 +248,22 @@ void setup(lv_obj_t* page) {
     lv_obj_add_event_cb(w.sliderBright, onBrightness, LV_EVENT_VALUE_CHANGED, nullptr);
     lv_obj_add_event_cb(w.sliderBright, onBrightness, LV_EVENT_RELEASED, nullptr);
 
-    // Units
+    // Units and relay-follows-phone, side by side
     lv_obj_t* ul = mkLabel(page, &lv_font_montserrat_16, col::dim());
     lv_label_set_text(ul, "Fahrenheit");
-    lv_obj_align(ul, LV_ALIGN_TOP_MID, -50, 276);
+    lv_obj_align(ul, LV_ALIGN_TOP_MID, -140, 276);
     w.swFahrenheit = lv_switch_create(page);
-    lv_obj_align(w.swFahrenheit, LV_ALIGN_TOP_MID, 50, 270);
+    lv_obj_align(w.swFahrenheit, LV_ALIGN_TOP_MID, -60, 270);
     if (g_settings.fahrenheit) lv_obj_add_state(w.swFahrenheit, LV_STATE_CHECKED);
     lv_obj_add_event_cb(w.swFahrenheit, onFahrenheit, LV_EVENT_VALUE_CHANGED, nullptr);
+
+    lv_obj_t* rl = mkLabel(page, &lv_font_montserrat_16, col::dim());
+    lv_label_set_text(rl, "Relay w/ phone");
+    lv_obj_align(rl, LV_ALIGN_TOP_MID, 60, 276);
+    w.swRelayPhone = lv_switch_create(page);
+    lv_obj_align(w.swRelayPhone, LV_ALIGN_TOP_MID, 160, 270);
+    if (g_settings.relayFollowsPhone) lv_obj_add_state(w.swRelayPhone, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(w.swRelayPhone, onRelayPhone, LV_EVENT_VALUE_CHANGED, nullptr);
 
     // BLE controls
     lv_obj_t* bp = mkButton(page, "Pause BLE 5 min", 200, 40, onPause, nullptr);

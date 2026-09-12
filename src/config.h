@@ -8,7 +8,7 @@
 // Firmware identity
 // ---------------------------------------------------------------------------
 #define FW_NAME     "batmon-display"
-#define FW_VERSION  "0.4.0"
+#define FW_VERSION  "0.5.0"
 
 // ---------------------------------------------------------------------------
 // Board selection
@@ -46,6 +46,14 @@
 #define CHG_FULL_SOC              95.0f   // main considered full: no charge expected
 #define CHG_FULL_MAIN_V           14.4f
 #define DATA_STALE_MS             10000  // grey-out readings older than this
+
+// Phone presence (see src/presence.h)
+#define PRESENCE_TIMEOUT_MS       90000   // phone counts as present this long after its last advert
+#define PRESENCE_MIN_RSSI         -95     // ignore weaker adverts
+#define PAIRING_WINDOW_MS         120000  // how long "Pair new phone" advertises
+#define BOOT_GRACE_MS             60000   // gate stays open after boot so the screen is reachable
+#define LEAVE_HOLD_MS             5000    // keep the BatMon link this long after the last phone leaves
+#define WAKE_MS                   30000   // touch/button wakes the screen in standby for this long
 
 // Button timing
 #define BUTTON_LONG_MS            800
