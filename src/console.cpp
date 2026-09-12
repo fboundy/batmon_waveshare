@@ -8,6 +8,7 @@
 #include "board/board.h"
 #include "config.h"
 #include "history.h"
+#include "presence.h"
 #include "settings.h"
 #include "ui/ui.h"
 
@@ -32,6 +33,14 @@ static void help() {
         "  forget                 forget the preferred BatMon and rescan\n"
         "  save                   flush history to flash now\n"
         "  page                   next page\n"
+        "  touchlog <0|1>         print raw touch coordinates (diagnostics)\n"
+        "  orient auto|normal|flipped|invert   display orientation (auto = accelerometer)\n"
+        "  phone list             paired phones and presence\n"
+        "  phone pair             open a 2 min pairing window (advertises 'BatMon Display')\n"
+        "  phone forget <n|all>\n"
+        "  phone name <n> <name>\n"
+        "  phone timeout <s>      away after this many seconds without an advert (15-600)\n"
+        "  relayphone <0|1>       relay on when a phone arrives, off when the last leaves\n"
         "  help");
 }
 
@@ -52,6 +61,26 @@ static void status() {
     Serial.printf("history: last save %lu s ago, %lu restored at boot\n",
                   history::lastSaveMs() ? (unsigned long)((millis() - history::lastSaveMs()) / 1000) : 0UL,
                   (unsigned long)history::restoredSamples());
+    Serial.printf("phones: %d paired, gate %s, relay follows phone %d\n", presence::count(),
+                  presence::gateOpen() ? "open" : "closed (standby)", g_settings.relayFollowsPhone);
+    float ax, ay, az;
+    if (board::readAccel(ax, ay, az))
+        Serial.printf("accel: x %.2f y %.2f z %.2f g   flipped %d   orientation %s%s\n", ax, ay, az, board::flipped(),
+                      g_settings.orientation == 0 ? "auto" : (g_settings.orientation == 1 ? "normal" : "flipped"),
+                      g_settings.accelInvert ? " (inverted)" : "");
+}
+
+static void phoneList() {
+    int n = presence::count();
+    if (n == 0) Serial.println("no phones paired");
+    for (int i = 0; i < n; i++) {
+        const presence::Phone& p = presence::phone(i);
+        Serial.printf("  %d: %-15s %s  irk=%d  %s", i, p.name, p.addr, p.hasIrk,
+                      presence::present(i) ? "PRESENT" : "away");
+        if (p.lastSeenMs) Serial.printf("  (%lu s ago, %d dBm)", (unsigned long)((millis() - p.lastSeenMs) / 1000), p.rssi);
+        Serial.println();
+    }
+    if (presence::pairing()) Serial.printf("pairing window: %lu s left\n", (unsigned long)presence::pairingRemainingMs() / 1000);
 }
 
 static bool onOff(const char* a, bool& out) {
@@ -140,6 +169,49 @@ static void execute(char* l) {
     } else if (!strcasecmp(cmd, "save")) {
         history::saveNow();
         Serial.println("history save queued");
+    } else if (!strcasecmp(cmd, "phone")) {
+        if (!a1 || !strcasecmp(a1, "list")) {
+            phoneList();
+        } else if (!strcasecmp(a1, "pair")) {
+            presence::startPairing(PAIRING_WINDOW_MS);
+            Serial.println("pairing window open for 2 min: connect from nRF Connect / LightBlue to 'BatMon Display' and read the characteristic");
+        } else if (!strcasecmp(a1, "stop")) {
+            presence::stopPairing();
+        } else if (!strcasecmp(a1, "forget") && a2) {
+            if (!strcasecmp(a2, "all")) presence::forgetAll();
+            else presence::forget(atoi(a2));
+            phoneList();
+        } else if (!strcasecmp(a1, "timeout") && a2) {
+            int v = atoi(a2);
+            if (v < PRESENCE_TIMEOUT_MIN_S) v = PRESENCE_TIMEOUT_MIN_S;
+            if (v > PRESENCE_TIMEOUT_MAX_S) v = PRESENCE_TIMEOUT_MAX_S;
+            g_settings.presenceTimeoutS = v;
+            g_settings.save();
+            uiChanged();
+            Serial.printf("presence timeout %d s\n", v);
+        } else if (!strcasecmp(a1, "name") && a2) {
+            char* nm = strtok(nullptr, "");
+            if (presence::rename(atoi(a2), nm)) phoneList();
+            else Serial.println("usage: phone name <n> <name>");
+        } else {
+            Serial.println("usage: phone list|pair|stop|forget <n|all>|name <n> <name>|timeout <s>");
+        }
+    } else if (!strcasecmp(cmd, "relayphone") && onOff(a1, on)) {
+        g_settings.relayFollowsPhone = on;
+        g_settings.save();
+        uiChanged();
+        Serial.printf("relay follows phone: %d\n", on);
+    } else if (!strcasecmp(cmd, "orient") && a1) {
+        if (!strcasecmp(a1, "auto")) g_settings.orientation = 0;
+        else if (!strcasecmp(a1, "normal")) g_settings.orientation = 1;
+        else if (!strcasecmp(a1, "flipped")) g_settings.orientation = 2;
+        else if (!strcasecmp(a1, "invert")) g_settings.accelInvert = !g_settings.accelInvert;
+        else { Serial.println("usage: orient auto|normal|flipped|invert"); return; }
+        g_settings.save();
+        Serial.printf("orientation %u invert %d\n", g_settings.orientation, g_settings.accelInvert);
+    } else if (!strcasecmp(cmd, "touchlog") && onOff(a1, on)) {
+        board::setTouchLog(on);
+        Serial.printf("touch logging %s\n", on ? "on" : "off");
     } else if (!strcasecmp(cmd, "page")) {
         if (board::lvgl().lock(200)) {
             ui::nextPage();

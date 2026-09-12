@@ -9,12 +9,15 @@
 #include "board.h"
 #include "button.h"
 #include "display_st7789.h"
+#include "qmi8658.h"
 
 namespace board {
 
 static DisplaySt7789 g_display;
 static LvglPort      g_lvgl;
 static Button        g_button;
+static Qmi8658       g_imu;
+static bool          g_flipped = LCD_ROTATE_180;
 
 static void flushArea(int x1, int y1, int x2, int y2, const void* px) {
     g_display.flush(x1, y1, x2, y2, px);
@@ -26,6 +29,7 @@ bool init() {
     bool ok = g_display.begin(LvglPort::flushDone);
     if (!ok) Serial.println("Display init failed!");
     g_button.begin(PIN_BUTTON, BUTTON_LONG_MS);
+    g_imu.begin();
 #if BOARD_HAS_RGB_LED
     rgbLedWrite(PIN_STATUS_LED, 0, 0, 0);
 #endif
@@ -47,6 +51,10 @@ bool init() {
 
 LvglPort& lvgl() { return g_lvgl; }
 void setBacklight(uint8_t percent) { g_display.setBacklight(percent); }
+void displayResync() {}
+void setFlipped(bool f) { g_flipped = f; g_display.setFlip(f); }
+bool flipped() { return g_flipped; }
+bool readAccel(float& ax, float& ay, float& az) { return g_imu.read(ax, ay, az); }
 bool clock(uint32_t&) { return false; }
 bool clockValid() { return false; }
 

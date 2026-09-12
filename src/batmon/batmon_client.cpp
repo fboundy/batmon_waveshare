@@ -12,6 +12,7 @@
 
 #include "../config.h"
 #include "../history.h"
+#include "../presence.h"
 #include "../settings.h"
 
 static const char* TAG = "batmon";
@@ -28,6 +29,7 @@ const char* linkStateName(LinkState s) {
         case LinkState::Connected:    return "Connected";
         case LinkState::Reconnecting: return "Reconnecting";
         case LinkState::Paused:       return "Paused";
+        case LinkState::Standby:      return "Standby";
     }
     return "?";
 }
@@ -37,11 +39,21 @@ const char* linkStateName(LinkState s) {
 // ---------------------------------------------------------------------------
 void Client::begin() {
     mutex_ = xSemaphoreCreateMutex();
+    candMutex_ = xSemaphoreCreateMutex();
     queue_ = xQueueCreate(8, sizeof(Cmd));
 
     NimBLEDevice::init("BatMon Display");
     NimBLEDevice::setPower(ESP_PWR_LVL_P9);
-    NimBLEDevice::setSecurityAuth(false, false, false);
+    presence::begin();   // pairing service + security settings; needs init() first
+
+    NimBLEScan* scan = NimBLEDevice::getScan();
+    scan->setScanCallbacks(this, true);   // every advert, not just the first per device
+    scan->setActiveScan(true);            // we want the scan response (names)
+    scan->setInterval(80);
+    scan->setWindow(30);
+    scan->setMaxResults(0);               // callbacks only, keep no list
+    scan->setDuplicateFilter(false);
+    startScan();
 
     xTaskCreatePinnedToCore(taskEntry, "batmon_ble", 8192, this, 2, nullptr, 0);
 }
@@ -111,54 +123,58 @@ static bool isBatMon(const NimBLEAdvertisedDevice* d) {
     return false;
 }
 
-bool Client::scanAndPick(NimBLEAddress& addr, std::string& name, int& rssi) {
-    NimBLEScan* scan = NimBLEDevice::getScan();
-    scan->setActiveScan(true);      // we want the scan response (name)
-    scan->setInterval(45);
-    scan->setWindow(30);
-    scan->setMaxResults(20);
+void Client::startScan() {
+    if (scanning_) return;
+    scanning_ = NimBLEDevice::getScan()->start(0, false, true);   // 0 = until stopped
+    if (!scanning_) ESP_LOGW(TAG, "scan start failed");
+}
 
-    NimBLEScanResults res = scan->getResults(BLE_SCAN_MS, false);
+void Client::stopScan() {
+    if (!scanning_) return;
+    NimBLEDevice::getScan()->stop();
+    scanning_ = false;
+}
 
-    const NimBLEAdvertisedDevice* best = nullptr;
+// NimBLE host task: every advertisement report.
+void Client::onResult(const NimBLEAdvertisedDevice* d) {
+    presence::onAdvert(d->getAddress(), d->getRSSI());
+
+    if (!isBatMon(d)) return;
+    ESP_LOGD(TAG, "BatMon adv %s rssi=%d name='%s'", d->getAddress().toString().c_str(),
+             d->getRSSI(), d->haveName() ? d->getName().c_str() : "");
+
     bool havePreferred = g_settings.deviceAddr[0] != 0;
-    for (int i = 0; i < res.getCount(); i++) {
-        const NimBLEAdvertisedDevice* d = res.getDevice(i);
-        // Dump everything we know about each advertiser so an unrecognised
-        // BatMon can be identified from the serial log.
-        {
-            std::string md = d->getManufacturerData();
-            char mdHex[64] = {0};
-            for (size_t k = 0; k < md.size() && k < 20; k++)
-                snprintf(mdHex + k * 3, sizeof mdHex - k * 3, "%02x ", (uint8_t)md[k]);
-            std::string svcs;
-            for (int s = 0; s < d->getServiceUUIDCount(); s++)
-                svcs += d->getServiceUUID(s).toString() + " ";
-            ESP_LOGD(TAG, "adv %s rssi=%d name='%s' mfg=[%s] svc=[%s]",
-                     d->getAddress().toString().c_str(), d->getRSSI(),
-                     d->haveName() ? d->getName().c_str() : "", mdHex, svcs.c_str());
-        }
-        if (!isBatMon(d)) continue;
-        ESP_LOGI(TAG, "  BatMon candidate %s '%s' rssi=%d", d->getAddress().toString().c_str(),
-                 d->getName().c_str(), d->getRSSI());
-        if (havePreferred) {
-            if (strcasecmp(d->getAddress().toString().c_str(), g_settings.deviceAddr) == 0) {
-                best = d;
-                break;
-            }
-        } else if (!best || d->getRSSI() > best->getRSSI()) {
-            best = d;
-        }
-    }
+    if (havePreferred && strcasecmp(d->getAddress().toString().c_str(), g_settings.deviceAddr) != 0) return;
 
-    bool ok = false;
-    if (best) {
-        addr = best->getAddress();
-        name = best->getName();
-        rssi = best->getRSSI();
-        ok = true;
+    xSemaphoreTake((SemaphoreHandle_t)candMutex_, portMAX_DELAY);
+    // Prefer the strongest signal seen in the last few seconds; a named
+    // report (scan response) refreshes the same device.
+    bool same = cand_.valid && cand_.addr == d->getAddress();
+    bool replace = !cand_.valid || same || d->getRSSI() > cand_.rssi || millis() - cand_.seenMs > 3000;
+    if (replace) {
+        if (!same || d->haveName()) cand_.name = d->getName();
+        cand_.valid = true;
+        cand_.addr = d->getAddress();
+        cand_.rssi = d->getRSSI();
+        cand_.seenMs = millis();
     }
-    scan->clearResults();
+    xSemaphoreGive((SemaphoreHandle_t)candMutex_);
+}
+
+void Client::onScanEnd(const NimBLEScanResults&, int reason) {
+    scanning_ = false;   // stopped by us, by connect(), or by the stack
+}
+
+bool Client::takeCandidate(NimBLEAddress& addr, std::string& name, int& rssi) {
+    xSemaphoreTake((SemaphoreHandle_t)candMutex_, portMAX_DELAY);
+    bool ok = cand_.valid && millis() - cand_.seenMs < 10000;
+    if (ok) {
+        addr = cand_.addr;
+        name = cand_.name;
+        rssi = cand_.rssi;
+    }
+    cand_.valid = false;
+    xSemaphoreGive((SemaphoreHandle_t)candMutex_);
     return ok;
 }
 
@@ -174,15 +190,16 @@ bool Client::connectTo(const NimBLEAddress& addr) {
         client_->setConnectionParams(12, 24, 0, 400);
     }
     linkDropped_ = false;
-    if (!client_->connect(addr, true, false, true)) {
-        ESP_LOGW(TAG, "connect() failed");
-        return false;
-    }
-    if (!findCharacteristics()) {
+    stopScan();   // the controller can't initiate a connection while scanning
+    bool ok = client_->connect(addr, true, false, true);
+    if (!ok) ESP_LOGW(TAG, "connect() failed");
+    if (ok && !findCharacteristics()) {
         client_->disconnect();
-        return false;
+        ok = false;
     }
-    return true;
+    // Keep scanning while connected only if we need it for phone presence.
+    if (!ok || presence::anyPaired()) startScan();
+    return ok;
 }
 
 void Client::disconnect() {
@@ -381,6 +398,19 @@ void Client::taskEntry(void* arg) {
 void Client::task() {
     for (;;) {
         history::tick();
+
+        // ---- standby: paired phones exist but none is here ----
+        if (!presence::gateOpen()) {
+            if (snapshot().link != LinkState::Standby) {
+                ESP_LOGI(TAG, "no phone present: releasing BatMon");
+                disconnect();
+                setLink(LinkState::Standby);
+            }
+            startScan();            // presence needs the scan running
+            handleCommands(500);
+            continue;
+        }
+
         // ---- paused? ----
         State s = snapshot();
         if (s.link == LinkState::Paused) {
@@ -394,12 +424,19 @@ void Client::task() {
             xSemaphoreGive((SemaphoreHandle_t)mutex_);
         }
 
-        // ---- scan ----
+        // ---- scan: wait for the continuous scan to report a BatMon ----
         setLink(LinkState::Scanning);
+        startScan();
         NimBLEAddress addr;
         std::string name;
         int rssi = 0;
-        if (!scanAndPick(addr, name, rssi)) {
+        bool found = false;
+        uint32_t tScan = millis();
+        while (!found && millis() - tScan < BLE_SCAN_MS && presence::gateOpen()) {
+            handleCommands(250);
+            found = takeCandidate(addr, name, rssi);
+        }
+        if (!found) {
             ESP_LOGI(TAG, "no BatMon found");
             handleCommands(BLE_RECONNECT_BACKOFF_MS);
             continue;
@@ -435,8 +472,9 @@ void Client::task() {
         lastSlowPollMs_ = 0;
         wantReconnect_ = false;
         uint32_t consecutiveFail = 0;
-        while (!linkDropped_ && !wantReconnect_) {
+        while (!linkDropped_ && !wantReconnect_ && presence::gateOpen()) {
             history::tick();
+            if (presence::anyPaired()) startScan();   // a phone may have been paired meanwhile
             uint32_t t0 = millis();
             bool ok = pollFast();
             if (ok && (lastSlowPollMs_ == 0 || millis() - lastSlowPollMs_ >= BLE_POLL_SLOW_MS)) {

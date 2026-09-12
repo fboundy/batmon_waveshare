@@ -16,6 +16,16 @@ LvglPort& lvgl();
 
 void setBacklight(uint8_t percent);
 
+// Orientation.  setFlipped() turns the picture (and touch) 180 degrees at
+// runtime; readAccel() gives gravity in g for the automatic mode.
+void setFlipped(bool flipped);
+bool flipped();
+bool readAccel(float& ax, float& ay, float& az);
+
+// Call after any flash write (NVS / LittleFS): RGB panels that stream from
+// PSRAM can lose sync while flash is busy.  No-op on other panels.
+void displayResync();
+
 // Monotonic seconds counter for history save/restore (RTC).  Returns false
 // on boards without one.  clockValid() is false if the clock restarted
 // since the last save (power loss) or the board has no clock at all.
@@ -28,5 +38,13 @@ void setStatusLed(uint8_t r, uint8_t g, uint8_t b);
 // BOOT button, polled from loop().
 enum class ButtonEvent : uint8_t { None, Short, Long };
 ButtonEvent pollButton();
+
+// millis() of the last touch or button press (for waking from standby).
+uint32_t lastInputMs();
+void noteInput();
+
+// Raw touch diagnostics: when enabled, every pressed sample is logged.
+void setTouchLog(bool on);
+bool touchLog();
 
 }  // namespace board

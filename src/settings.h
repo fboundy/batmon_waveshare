@@ -17,6 +17,14 @@ struct Settings {
     // Chart page: bit0 main V, bit1 aux V, bit2 SoC, bit3 current; range 0..3
     uint8_t chartMask = 0x01;
     uint8_t chartRange = 0;
+    // Relay on when a paired phone arrives, off when the last one leaves.
+    bool relayFollowsPhone = false;
+    // A phone counts as present this long after its last advertisement.
+    uint16_t presenceTimeoutS = 90;
+    // Display orientation: 0 = automatic (accelerometer), 1 = normal, 2 = flipped.
+    uint8_t orientation = 0;
+    // Swap the accelerometer's sense of "up" if auto gets it backwards.
+    bool accelInvert = false;
 
     void load();
     void save() const;

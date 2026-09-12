@@ -162,5 +162,20 @@ continue on another machine. Newest entries at the bottom.
   charging). Both icons 42 px on the round board, 24 px on the 1.9.
   Thresholds `CHG_*` in config.h.
 
+## 2026-09-12 - branch `feature/phone-presence` (v0.5.0)
+
+- Phone pairing/presence implemented on a separate branch as requested:
+  `src/presence.*`, Phones page, Relay-w/-phone setting, serial `phone`
+  commands, continuous callback-driven scan in the client, `Standby` link
+  state, backlight standby with touch/button wake. Docs in
+  [09-phone-presence.md](09-phone-presence.md).
+- Design points: RPA resolution done in software (AES-128 `ah()`, byte
+  order as NimBLE's `ble_hs_resolv_rpa`) so it does not depend on the
+  controller's resolving list; IRK read from NimBLE's bond store via
+  `ble_store_read_peer_sec`; gate has 60 s boot grace and 5 s leave-hold so
+  the relay-off command goes out before the link drops.
+- Both envs build (2.1: RAM 42.5 %, flash 19.2 %). **Untested on
+  hardware** - the 2.1 was off USB. Verification checklist in docs/09.
+
 ### Not yet done
 - Real time on the chart axis needs a time source; see roadmap.

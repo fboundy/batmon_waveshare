@@ -67,11 +67,13 @@
 #define LCD_VSYNC_BACK       8
 #define LCD_VSYNC_FRONT      8
 // Bounce buffer (in pixels) avoids screen drift when PSRAM bandwidth is contended.
-#define LCD_BOUNCE_PX        (LCD_H_RES * 10)
+#define LCD_BOUNCE_PX        (LCD_H_RES * LCD_BOUNCE_LINES)
 
-// Mount orientation: 1 = rotate the whole UI (and touch) by 180 degrees.
-// Done in software on the frame buffer; see docs/03-architecture.md.
+// Default orientation until the accelerometer / setting decides (see
+// board::setFlipped): 1 = picture turned 180 degrees in the panel.
 #define LCD_ROTATE_180       1
+// Bounce buffer lines: more = more tolerance to PSRAM stalls, more SRAM.
+#define LCD_BOUNCE_LINES     20
 
 // Backlight PWM
 #define BL_PWM_FREQ_HZ       20000

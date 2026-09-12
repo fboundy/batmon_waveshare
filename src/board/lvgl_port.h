@@ -25,6 +25,9 @@ struct LvglConfig {
     bool flushAsync = false;     // driver calls LvglPort::flushDone() when finished
     // x2,y2 inclusive.  In direct mode always called with the whole frame.
     void (*flush)(int x1, int y1, int x2, int y2, const void* px) = nullptr;
+    // Direct mode: block until the swap has taken effect so LVGL never draws
+    // into the buffer that is still being scanned out.  Optional.
+    void (*waitVsync)() = nullptr;
     // Optional touch: return true while pressed with the point in LVGL coords.
     bool (*touchRead)(uint16_t& x, uint16_t& y) = nullptr;
 };

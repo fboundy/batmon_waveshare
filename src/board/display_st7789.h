@@ -30,6 +30,9 @@ public:
     void setBacklight(uint8_t percent);
     uint8_t backlight() const { return backlight_; }
 
+    // 180 degree turn (landscape either way up).
+    void setFlip(bool flipped);
+
 private:
     static bool onTransDone(esp_lcd_panel_io_handle_t, esp_lcd_panel_io_event_data_t*, void* ctx);
     void sendTuning();

@@ -3,6 +3,8 @@
 #include <Preferences.h>
 #include <string.h>
 
+#include "board/board.h"
+
 Settings g_settings;
 
 static const char* NS = "batmon";
@@ -18,6 +20,10 @@ void Settings::load() {
     pollMs         = p.getUShort("poll", pollMs);
     chartMask      = p.getUChar("cmask", chartMask);
     chartRange     = p.getUChar("crange", chartRange);
+    relayFollowsPhone = p.getBool("relayph", relayFollowsPhone);
+    presenceTimeoutS = p.getUShort("phto", presenceTimeoutS);
+    orientation    = p.getUChar("orient", orientation);
+    accelInvert    = p.getBool("accinv", accelInvert);
     p.end();
 }
 
@@ -32,7 +38,12 @@ void Settings::save() const {
     p.putUShort("poll", pollMs);
     p.putUChar("cmask", chartMask);
     p.putUChar("crange", chartRange);
+    p.putBool("relayph", relayFollowsPhone);
+    p.putUShort("phto", presenceTimeoutS);
+    p.putUChar("orient", orientation);
+    p.putBool("accinv", accelInvert);
     p.end();
+    board::displayResync();   // the NVS write may have upset the RGB panel
 }
 
 void Settings::reset() {

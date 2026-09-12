@@ -4,10 +4,14 @@
 #include "../config.h"
 #if BOARD_ROUND
 
+#include <initializer_list>
+
 #include "../settings.h"
 #include "ui_internal.h"
 
 LV_FONT_DECLARE(lv_font_montserrat_72_digits)   // src/ui/font_montserrat_72_digits.c
+LV_FONT_DECLARE(lv_font_icons_42)               // src/ui/font_icons_42.c: mobile phone glyph
+#define SYMBOL_MOBILE "\xEF\x8F\x8D"             // U+F3CD
 
 namespace ui {
 namespace layout {
@@ -38,7 +42,7 @@ void halo(lv_obj_t* page) {
     lv_label_set_text(w.lblName, "BatMon");
 
     // Vertical layout (centre-relative): SoC -108, volts -36, A/W +14,
-    // temp +50, runtime +78, relay +124, status icons +192.
+    // temp +50, runtime +78, relay +124, status icons +190, phone name +224.
 
     // SoC: 72 px digits + 32 px unit on a shared baseline
     lv_obj_t* rowSoc = mkRow(page, 6);
@@ -93,13 +97,24 @@ void halo(lv_obj_t* page) {
     lv_obj_set_style_bg_color(w.swHaloRelay, col::accent(), LV_PART_INDICATOR | LV_STATE_CHECKED);
     lv_obj_add_event_cb(w.swHaloRelay, onSwitchRelay, LV_EVENT_VALUE_CHANGED, nullptr);
 
-    // Status icons in the arc's bottom gap: Bluetooth link and charge state
+    // Status icons in the arc's bottom gap: Bluetooth link, phone presence,
+    // charge state - all 42 px, on one line; the phone's name sits under it.
     w.lblBt = mkLabel(page, &lv_font_montserrat_42, col::bad());
     lv_label_set_text(w.lblBt, LV_SYMBOL_BLUETOOTH);
-    lv_obj_align(w.lblBt, LV_ALIGN_CENTER, -36, 192);
+    lv_obj_align(w.lblBt, LV_ALIGN_CENTER, -84, 190);
+    w.lblPhoneIcon = mkLabel(page, &lv_font_icons_42, col::bad());
+    lv_label_set_text(w.lblPhoneIcon, SYMBOL_MOBILE);
+    lv_obj_align(w.lblPhoneIcon, LV_ALIGN_CENTER, 0, 190);
+    lv_obj_add_flag(w.lblPhoneIcon, LV_OBJ_FLAG_HIDDEN);
     w.lblCharge = mkLabel(page, &lv_font_montserrat_42, col::dim());
     lv_label_set_text(w.lblCharge, LV_SYMBOL_CHARGE);
-    lv_obj_align(w.lblCharge, LV_ALIGN_CENTER, 36, 192);
+    lv_obj_align(w.lblCharge, LV_ALIGN_CENTER, 84, 190);
+    w.lblPhoneName = mkLabel(page, &lv_font_montserrat_12, col::dim());
+    lv_obj_set_width(w.lblPhoneName, 84);
+    lv_obj_set_style_text_align(w.lblPhoneName, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(w.lblPhoneName, LV_LABEL_LONG_DOT);
+    lv_obj_align(w.lblPhoneName, LV_ALIGN_CENTER, 0, 224);
+    lv_obj_add_flag(w.lblPhoneName, LV_OBJ_FLAG_HIDDEN);
 }
 
 // ---------------------------------------------------------------------------
@@ -109,25 +124,25 @@ void chart(lv_obj_t* page) {
     // Series toggles
     static const char* names[4] = {"Main V", "Aux V", "SoC", "Amps"};
     const lv_color_t cols[4] = {col::serMain(), col::serAux(), col::serSoc(), col::serAmps()};
-    const int bw = 74, bh = 30, gap = 6;
+    const int bw = 76, bh = 40, gap = 6;
     int bx = (LCD_H_RES - (4 * bw + 3 * gap)) / 2;
     for (int i = 0; i < 4; i++) {
         w.btnSeries[i] = mkCheckButton(page, names[i], bw, bh, cols[i], onSeriesToggle, (void*)(intptr_t)i);
-        lv_obj_set_pos(w.btnSeries[i], bx + i * (bw + gap), 64);
+        lv_obj_set_pos(w.btnSeries[i], bx + i * (bw + gap), 66);
     }
 
-    lv_obj_t* c = mkChart(page, 316, 186, &lv_font_montserrat_12, 44);
-    lv_obj_set_pos(c, (LCD_H_RES - 316) / 2, 114);
+    lv_obj_t* c = mkChart(page, 316, 176, &lv_font_montserrat_12, 44);
+    lv_obj_set_pos(c, (LCD_H_RES - 316) / 2, 122);
 
     w.lblWindow = mkLabel(page, &lv_font_montserrat_14, col::text());
-    lv_obj_align(w.lblWindow, LV_ALIGN_TOP_MID, 0, 310);
+    lv_obj_align(w.lblWindow, LV_ALIGN_TOP_MID, 0, 308);
 
-    // Range + scroll row
+    // Range + scroll row (thumb-sized)
     static const char* rn[4] = {"Hour", "Day", "Week", "Month"};
-    const int aw = 40, rw = 62, rh = 32, rg = 6;
+    const int aw = 56, rw = 60, rh = 42, rg = 6;
     int total = 2 * aw + 4 * rw + 5 * rg;
-    int x = (LCD_H_RES - total) / 2, y = 336;
-    lv_obj_t* bl = mkButton(page, LV_SYMBOL_LEFT, aw, rh, onScroll, (void*)(intptr_t)1);
+    int x = (LCD_H_RES - total) / 2, y = 332;
+    lv_obj_t* bl = mkButton(page, LV_SYMBOL_LEFT, aw, rh, onScroll, (void*)(intptr_t)1, &lv_font_montserrat_20);
     lv_obj_set_pos(bl, x, y);
     x += aw + rg;
     for (int i = 0; i < 4; i++) {
@@ -138,11 +153,11 @@ void chart(lv_obj_t* page) {
         lv_obj_set_pos(w.btnRange[i], x, y);
         x += rw + rg;
     }
-    lv_obj_t* br = mkButton(page, LV_SYMBOL_RIGHT, aw, rh, onScroll, (void*)(intptr_t)-1);
+    lv_obj_t* br = mkButton(page, LV_SYMBOL_RIGHT, aw, rh, onScroll, (void*)(intptr_t)-1, &lv_font_montserrat_20);
     lv_obj_set_pos(br, x, y);
 
     w.lblScale = mkLabel(page, &lv_font_montserrat_12, col::dim());
-    lv_obj_align(w.lblScale, LV_ALIGN_TOP_MID, 0, 378);
+    lv_obj_align(w.lblScale, LV_ALIGN_TOP_MID, 0, 380);
     lv_label_set_text(w.lblScale, "");
 }
 
@@ -183,7 +198,99 @@ void detail(lv_obj_t* page) {
 }
 
 // ---------------------------------------------------------------------------
-// Page 3: Setup
+// Page 3: Phones
+// ---------------------------------------------------------------------------
+void phones(lv_obj_t* page) {
+    lv_obj_t* title = mkLabel(page, &lv_font_montserrat_20, col::accent());
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 46);
+    lv_label_set_text(title, "Phones");
+
+    // Selectable list: tap a phone to select it, then Rename / Delete
+    // Scrollable (drag) list, 3 rows visible
+    lv_obj_t* list = lv_obj_create(page);
+    lv_obj_remove_style_all(list);
+    lv_obj_set_size(list, 300, 112);
+    lv_obj_align(list, LV_ALIGN_TOP_MID, 0, 76);
+    lv_obj_set_scroll_dir(list, LV_DIR_VER);
+    lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(list, 4, 0);
+    lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_AUTO);
+    for (int i = 0; i < 8; i++) {
+        lv_obj_t* b = mkButton(list, "", 300, 34, onPhoneRow, (void*)(intptr_t)i);
+        lv_obj_set_style_radius(b, 6, 0);
+        lv_obj_add_flag(b, LV_OBJ_FLAG_HIDDEN);
+        w.phoneRows[i] = b;
+    }
+
+    lv_obj_t* bp = mkButton(page, "Pair new phone", 300, 36, onPairPhone, nullptr);
+    lv_obj_align(bp, LV_ALIGN_TOP_MID, 0, 194);
+    w.btnPairLbl = lv_obj_get_child(bp, 0);
+
+    w.btnRename = mkButton(page, "Rename", 145, 36, onRenamePhone, nullptr);
+    lv_obj_align(w.btnRename, LV_ALIGN_TOP_MID, -78, 236);
+    w.btnDelete = mkButton(page, "Delete", 145, 36, onDeletePhone, nullptr);
+    lv_obj_set_style_bg_color(w.btnDelete, col::bad(), LV_STATE_PRESSED);
+    lv_obj_align(w.btnDelete, LV_ALIGN_TOP_MID, 78, 236);
+
+    // Presence timeout: "Away after 90 s" with -/+ 15 s
+    lv_obj_t* bm = mkButton(page, LV_SYMBOL_MINUS, 48, 34, onTimeout, (void*)(intptr_t)-15);
+    lv_obj_align(bm, LV_ALIGN_TOP_MID, -110, 278);
+    w.lblTimeout = mkLabel(page, &lv_font_montserrat_16, col::text());
+    lv_obj_align(w.lblTimeout, LV_ALIGN_TOP_MID, 0, 286);
+    lv_obj_t* bpl = mkButton(page, LV_SYMBOL_PLUS, 48, 34, onTimeout, (void*)(intptr_t)15);
+    lv_obj_align(bpl, LV_ALIGN_TOP_MID, 110, 278);
+
+    // Relay follows phone
+    lv_obj_t* rl = mkLabel(page, &lv_font_montserrat_16, col::dim());
+    lv_label_set_text(rl, "Relay follows phone");
+    lv_obj_align(rl, LV_ALIGN_TOP_MID, -46, 326);
+    w.swRelayPhone = lv_switch_create(page);
+    lv_obj_align(w.swRelayPhone, LV_ALIGN_TOP_MID, 92, 320);
+    if (g_settings.relayFollowsPhone) lv_obj_add_state(w.swRelayPhone, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(w.swRelayPhone, onRelayPhone, LV_EVENT_VALUE_CHANGED, nullptr);
+    for (lv_obj_t* b : {w.btnRename, w.btnDelete}) {
+        lv_obj_set_style_bg_color(b, col::track(), LV_STATE_DISABLED);
+        lv_obj_set_style_text_color(lv_obj_get_child(b, 0), col::stale(), LV_STATE_DISABLED);
+        lv_obj_add_state(b, LV_STATE_DISABLED);
+    }
+
+    w.lblPairStatus = mkLabel(page, &lv_font_montserrat_14, col::dim());
+    lv_obj_set_width(w.lblPairStatus, 300);
+    lv_obj_set_style_text_align(w.lblPairStatus, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(w.lblPairStatus, LV_LABEL_LONG_WRAP);
+    lv_obj_align(w.lblPairStatus, LV_ALIGN_TOP_MID, 0, 360);
+
+    // Name dialog: full-screen overlay on the screen (above the tileview)
+    w.nameDlg = lv_obj_create(lv_scr_act());
+    lv_obj_remove_style_all(w.nameDlg);
+    lv_obj_set_size(w.nameDlg, LCD_H_RES, LCD_V_RES);
+    lv_obj_set_style_bg_color(w.nameDlg, col::bg(), 0);
+    lv_obj_set_style_bg_opa(w.nameDlg, LV_OPA_COVER, 0);
+    lv_obj_clear_flag(w.nameDlg, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(w.nameDlg, LV_OBJ_FLAG_HIDDEN);
+
+    w.nameTitle = mkLabel(w.nameDlg, &lv_font_montserrat_18, col::accent());
+    lv_obj_align(w.nameTitle, LV_ALIGN_CENTER, 0, -150);
+    lv_label_set_text(w.nameTitle, "Name this phone");
+
+    w.nameTa = lv_textarea_create(w.nameDlg);
+    lv_obj_set_size(w.nameTa, 300, 44);
+    lv_obj_align(w.nameTa, LV_ALIGN_CENTER, 0, -100);
+    lv_textarea_set_one_line(w.nameTa, true);
+    lv_textarea_set_max_length(w.nameTa, 15);
+    lv_obj_set_style_text_font(w.nameTa, &lv_font_montserrat_20, 0);
+
+    w.nameKb = lv_keyboard_create(w.nameDlg);
+    lv_obj_set_size(w.nameKb, 360, 200);
+    lv_obj_align(w.nameKb, LV_ALIGN_CENTER, 0, 48);
+    lv_keyboard_set_textarea(w.nameKb, w.nameTa);
+    lv_obj_set_style_text_font(w.nameKb, &lv_font_montserrat_14, LV_PART_ITEMS);
+    lv_obj_add_event_cb(w.nameKb, onNameKeyboard, LV_EVENT_READY, nullptr);
+    lv_obj_add_event_cb(w.nameKb, onNameKeyboard, LV_EVENT_CANCEL, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// Page 4: Setup
 // ---------------------------------------------------------------------------
 void setup(lv_obj_t* page) {
     lv_obj_t* title = mkLabel(page, &lv_font_montserrat_20, col::accent());

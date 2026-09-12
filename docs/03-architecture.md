@@ -9,7 +9,8 @@ src/
 │   └── ws_lcd_1_9.h         pins / panel parameters: ESP32-S3-LCD-1.9 (landscape 320x170)
 ├── settings.{h,cpp}         NVS-backed user settings (Preferences, namespace "batmon")
 ├── history.{h,cpp}          two-tier PSRAM ring buffers of V / aux V / SoC / I, persisted to LittleFS
-├── console.{h,cpp}          USB serial command console (settings, switch/relay, pause, page)
+├── console.{h,cpp}          USB serial command console (settings, switch/relay, pause, page, phones)
+├── presence.{h,cpp}         phone pairing (bonding) + presence from resolvable private addresses; standby gate
 ├── board/
 │   ├── board.h              the board interface the app uses (init, lvgl, backlight, clock, LED, button)
 │   ├── board_ws_2_1.cpp     implementation for the 2.1 (compiled only in that env)
@@ -63,7 +64,7 @@ interactive widgets.
 | Task | Core | Priority | Does |
 |---|---|---|---|
 | `loopTask` (Arduino `loop()`) | 1 | 1 | `lv_timer_handler()`, touch polling, BOOT button, serial console, calls `ui::update()` every 250 ms with a fresh snapshot |
-| `batmon_ble` | 0 | 2 | everything NimBLE: scanning, connecting, sequential polling, executing queued commands |
+| `batmon_ble` | 0 | 2 | NimBLE central: waits for the continuous scan to report a BatMon, connects, polls, executes queued commands; honours the presence gate |
 | NimBLE host task | 0 | — | created by NimBLE-Arduino |
 | `hist_save` | 0 | 1 | copies the history buffers under the lock, then writes `/history.bin` to LittleFS |
 | `lvgl_tick` esp_timer | — | — | `lv_tick_inc(2)` every 2 ms |
@@ -92,10 +93,17 @@ a Wi-Fi / MQTT bridge that wants to show status).
                                                               2 s backoff
 ```
 
-* **Scanning** — 6 s active scan. A device qualifies if it advertises the
-  BatMon service UUID, manufacturer ID 4077, or a `BK-` name. If a preferred
-  address is stored it must match; otherwise the strongest RSSI wins and is
-  stored as the preferred device.
+* **Scanning** — one continuous active scan runs from boot (callback per
+  advertisement). It feeds phone presence (`presence::onAdvert`) and
+  BatMon discovery: a device qualifies if it advertises the BatMon service
+  UUID, manufacturer ID 4077, or a `BK-` name; the task waits up to 6 s for
+  a candidate. If a preferred address is stored it must match; otherwise
+  the strongest RSSI wins and is stored as the preferred device. The scan
+  is stopped for the connection attempt and restarted afterwards (kept
+  running during the connection only when phones are paired).
+* **Standby** — paired phones exist and none is present
+  (`presence::gateOpen()` false): the link is released and the task idles
+  until a phone returns. See [09-phone-presence.md](09-phone-presence.md).
 * **Connecting** — 10 s timeout, connection interval 15–30 ms. On connect the
   full GATT table is logged and the two characteristics located by UUID.
 * **Connected** — fast poll every `pollMs` (default 1 s: main V, I, ext T,
@@ -162,7 +170,8 @@ round panel (roughly a 440 px diameter).
 | Halo (wide) | horizontal SoC **bar** coloured the same way, 28 px SoC %, Main/Aux voltages, current/power/temperature, runtime, "Relay ON/OFF" text, Bluetooth and charge-status glyphs (24 px) top right |
 | Chart | line chart of Main V / Aux V / SoC / Amps (toggle buttons), **Hour / Day / Week / Month** range buttons and ◀ ▶ to scroll one range at a time. Left axis is volts (auto-ranged); right axis is SoC % when SoC is shown, otherwise amps (auto-ranged). When both SoC and amps are on, amps are scaled onto the SoC axis and the scale is printed under the chart |
 | Details | every raw reading, RSSI, poll counters, MAC, time since the last history save; **Relay** and **Switch** toggles |
-| Setup | capacity ±1/±10 Ah, brightness slider, °C/°F, **Pause BLE 5 min / Resume**, **Forget device**, firmware version |
+| Phones | paired phones with present/away + RSSI, **Pair new phone** (2 min window with instructions), **Forget all phones**; on the 1.9 pairing is started from the serial console |
+| Setup | capacity ±1/±10 Ah, brightness slider, °C/°F, **Relay w/ phone**, **Pause BLE 5 min / Resume**, **Forget device**, firmware version |
 
 Readings older than 10 s are drawn grey so a frozen link is obvious.
 

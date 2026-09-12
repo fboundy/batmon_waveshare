@@ -4,11 +4,13 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "../batmon/batmon_client.h"
 #include "../board/board.h"
 #include "../config.h"
 #include "../history.h"
+#include "../presence.h"
 #include "../settings.h"
 #include "ui_internal.h"
 
@@ -18,13 +20,15 @@ using batmon::State;
 namespace ui {
 
 Widgets w;
+static constexpr size_t MAX_PHONE_LIST = 256;
 
 const char* const detailNames[D_COUNT] = {
     "Main voltage", "Aux voltage", "Current", "Power", "Amp hours", "Ah full ref",
     "Ah min", "Ext temp", "CPU temp", "RSSI", "Polls ok/err", "Address", "History saved"};
 
 static lv_obj_t* tv = nullptr;
-static lv_obj_t* pages[4] = {};
+static constexpr int NPAGES = 5;
+static lv_obj_t* pages[NPAGES] = {};
 static constexpr int PAGE_CHART = 1;
 
 // After a user toggle, stop syncing the switches from device state for a
@@ -102,13 +106,13 @@ lv_obj_t* mkButton(lv_obj_t* parent, const char* text, int wd, int ht, lv_event_
     return b;
 }
 
+// A toggle button driven by LV_EVENT_CLICKED with the CHECKED state managed
+// by the callback (via applySeriesButtons), like the range buttons.
 lv_obj_t* mkCheckButton(lv_obj_t* parent, const char* text, int wd, int ht, lv_color_t on,
                         lv_event_cb_t cb, void* ud) {
-    lv_obj_t* b = mkButton(parent, text, wd, ht, nullptr, nullptr, &lv_font_montserrat_14);
-    lv_obj_add_flag(b, LV_OBJ_FLAG_CHECKABLE);
+    lv_obj_t* b = mkButton(parent, text, wd, ht, cb, ud, &lv_font_montserrat_14);
     lv_obj_set_style_bg_color(b, on, LV_STATE_CHECKED);
     lv_obj_set_style_text_color(lv_obj_get_child(b, 0), lv_color_black(), LV_STATE_CHECKED);
-    lv_obj_add_event_cb(b, cb, LV_EVENT_VALUE_CHANGED, ud);
     return b;
 }
 
@@ -171,6 +175,119 @@ void onForget(lv_event_t*) {
     batmon::g_client.forgetDevice();
 }
 
+void onPairPhone(lv_event_t*) {
+    if (presence::pairing()) presence::stopPairing();
+    else presence::startPairing(PAIRING_WINDOW_MS);
+}
+
+void onForgetPhones(lv_event_t*) {
+    presence::forgetAll();
+}
+
+void onRelayPhone(lv_event_t* e) {
+    g_settings.relayFollowsPhone = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+    g_settings.save();
+}
+
+// ---- phone list selection / naming ----
+static int selectedPhone = -1;
+static int namingPhone = -1;
+static int lastPhoneCount = -1;
+
+static void applyPhoneSelection() {
+    for (int i = 0; i < 8; i++) {
+        if (!w.phoneRows[i]) continue;
+        lv_obj_set_style_border_width(w.phoneRows[i], i == selectedPhone ? 2 : 0, 0);
+        lv_obj_set_style_border_color(w.phoneRows[i], col::accent(), 0);
+    }
+    bool sel = selectedPhone >= 0 && selectedPhone < presence::count();
+    for (lv_obj_t* b : {w.btnRename, w.btnDelete}) {
+        if (!b) continue;
+        if (sel) lv_obj_clear_state(b, LV_STATE_DISABLED); else lv_obj_add_state(b, LV_STATE_DISABLED);
+    }
+}
+
+static void openNameDialog(int idx) {
+    if (!w.nameDlg || idx < 0 || idx >= presence::count()) return;
+    namingPhone = idx;
+    char buf[48];
+    snprintf(buf, sizeof buf, "Name for %s", presence::phone(idx).name);
+    if (w.nameTitle) lv_label_set_text(w.nameTitle, buf);
+    lv_textarea_set_text(w.nameTa, presence::phone(idx).name);
+    lv_obj_clear_flag(w.nameDlg, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(w.nameDlg);
+}
+
+void onPhoneRow(lv_event_t* e) {
+    selectedPhone = (int)(intptr_t)lv_event_get_user_data(e);
+    applyPhoneSelection();
+}
+
+void onRenamePhone(lv_event_t*) {
+    openNameDialog(selectedPhone);
+}
+
+static void doDeletePhone() {
+    if (selectedPhone < 0) return;
+    presence::forget(selectedPhone);
+    selectedPhone = -1;
+    lastPhoneCount = presence::count();   // a deletion is not a new pairing
+    applyPhoneSelection();
+}
+
+static void onConfirmDelete(lv_event_t* e) {
+    lv_obj_t* mbox = lv_event_get_current_target(e);
+    const char* btn = lv_msgbox_get_active_btn_text(mbox);
+    if (btn && !strcmp(btn, "Delete")) doDeletePhone();
+    lv_msgbox_close(mbox);
+}
+
+void onDeletePhone(lv_event_t*) {
+    if (selectedPhone < 0) return;
+    if (presence::count() > 1) {
+        doDeletePhone();
+        return;
+    }
+    // Last phone: this switches the display back to "open" mode.
+    static const char* btns[] = {"Cancel", "Delete", ""};
+    lv_obj_t* mbox = lv_msgbox_create(nullptr, "Delete last phone?",
+                                      "With no phones paired the display reverts to Open mode: "
+                                      "always on and always connected to the BatMon.",
+                                      btns, false);
+    lv_obj_set_width(mbox, 320);
+    lv_obj_add_event_cb(mbox, onConfirmDelete, LV_EVENT_VALUE_CHANGED, nullptr);
+    lv_obj_center(mbox);
+}
+
+void setTimeoutLabel() {
+    if (!w.lblTimeout) return;
+    char buf[32];
+    snprintf(buf, sizeof buf, "Away after %u s", g_settings.presenceTimeoutS);
+    lv_label_set_text(w.lblTimeout, buf);
+}
+
+void onTimeout(lv_event_t* e) {
+    int delta = (int)(intptr_t)lv_event_get_user_data(e);
+    int v = (int)g_settings.presenceTimeoutS + delta;
+    if (v < PRESENCE_TIMEOUT_MIN_S) v = PRESENCE_TIMEOUT_MIN_S;
+    if (v > PRESENCE_TIMEOUT_MAX_S) v = PRESENCE_TIMEOUT_MAX_S;
+    g_settings.presenceTimeoutS = v;
+    g_settings.save();
+    setTimeoutLabel();
+}
+
+void onNameKeyboard(lv_event_t* e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_READY && namingPhone >= 0) {
+        const char* t = lv_textarea_get_text(w.nameTa);
+        if (t && t[0]) presence::rename(namingPhone, t);
+    }
+    if (code == LV_EVENT_READY || code == LV_EVENT_CANCEL) {
+        namingPhone = -1;
+        lv_obj_add_flag(w.nameDlg, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Chart
 // ---------------------------------------------------------------------------
@@ -220,25 +337,26 @@ static void rebuildChart() {
         if ((mask & 1) && !isnan(s.mainV)) { vmin = fminf(vmin, s.mainV); vmax = fmaxf(vmax, s.mainV); }
         if ((mask & 2) && !isnan(s.auxV))  { vmin = fminf(vmin, s.auxV);  vmax = fmaxf(vmax, s.auxV); }
     }
-    if (vmin > vmax) { vmin = 10.0f; vmax = 15.0f; }
-    vmin = floorf((vmin - 0.15f) * 2.0f) / 2.0f;
-    vmax = ceilf((vmax + 0.15f) * 2.0f) / 2.0f;
-    if (vmax - vmin < 1.0f) vmax = vmin + 1.0f;
+    // 12..15 V unless the data goes outside that, in 0.5 V steps
+    if (vmin > vmax) { vmin = 12.0f; vmax = 15.0f; }
+    vmin = fminf(12.0f, floorf((vmin - 0.15f) * 2.0f) / 2.0f);
+    vmax = fmaxf(15.0f, ceilf((vmax + 0.15f) * 2.0f) / 2.0f);
     lv_chart_set_range(w.chart, LV_CHART_AXIS_PRIMARY_Y, (lv_coord_t)lroundf(vmin * 100), (lv_coord_t)lroundf(vmax * 100));
 
-    // --- amps: auto range, mapped onto the 0..100 right axis ---
-    float amin = 1e9f, amax = -1e9f;
+    // --- amps: -30..+30 A (widened in 10 A steps if the data exceeds it).
+    // The right axis is amps whenever the amps series is on; SoC is then
+    // drawn scaled onto it (0 % = bottom, 100 % = top).
+    float amin = -30.0f, amax = 30.0f;
     for (int i = 0; i < history::POINTS; i++) {
         const history::Sample& s = chartPts[i];
-        if (!isnan(s.current)) { amin = fminf(amin, s.current); amax = fmaxf(amax, s.current); }
+        if (!isnan(s.current)) {
+            if (s.current < amin) amin = floorf(s.current / 10.0f) * 10.0f;
+            if (s.current > amax) amax = ceilf(s.current / 10.0f) * 10.0f;
+        }
     }
-    if (amin > amax) { amin = -1; amax = 1; }
-    amin = floorf(amin - 0.2f);
-    amax = ceilf(amax + 0.2f);
-    if (amax - amin < 2.0f) amax = amin + 2.0f;
     ampMin = amin;
     ampMax = amax;
-    secIsAmps = !(mask & 4) && (mask & 8);
+    secIsAmps = (mask & 8) != 0;
     lv_chart_set_range(w.chart, LV_CHART_AXIS_SECONDARY_Y, 0, 100);
 
     lv_coord_t* aMain = lv_chart_get_y_array(w.chart, w.serMain);
@@ -262,8 +380,8 @@ static void rebuildChart() {
     setWindowLabel();
     if (w.lblScale) {
         char buf[64];
-        if ((mask & 8) && !secIsAmps)
-            snprintf(buf, sizeof buf, "amps scaled %.0f to %.0f A (right axis = SoC)", amin, amax);
+        if (secIsAmps && (mask & 4))
+            snprintf(buf, sizeof buf, "left: volts   right: amps (SoC 0-100%% on same axis)");
         else if (secIsAmps)
             snprintf(buf, sizeof buf, "left: volts   right: amps");
         else if (mask & 4)
@@ -286,7 +404,7 @@ static void onChartDraw(lv_event_t* e) {
     } else if (d->id == LV_CHART_AXIS_SECONDARY_Y) {
         if (secIsAmps) {
             float a = ampMin + d->value / 100.0f * (ampMax - ampMin);
-            lv_snprintf(d->text, d->text_length, "%d", (int)lroundf(a));
+            lv_snprintf(d->text, d->text_length, "%d A", (int)lroundf(a));
         } else {
             lv_snprintf(d->text, d->text_length, "%d%%", d->value);
         }
@@ -298,9 +416,9 @@ lv_obj_t* mkChart(lv_obj_t* parent, int wd, int ht, const lv_font_t* tickFont, i
     lv_obj_set_size(c, wd, ht);
     lv_chart_set_type(c, LV_CHART_TYPE_LINE);
     lv_chart_set_point_count(c, history::POINTS);
-    lv_chart_set_div_line_count(c, 5, 5);
-    lv_chart_set_axis_tick(c, LV_CHART_AXIS_PRIMARY_Y, 6, 3, 5, 2, true, tickLabelSize);
-    lv_chart_set_axis_tick(c, LV_CHART_AXIS_SECONDARY_Y, 6, 3, 5, 2, true, tickLabelSize);
+    lv_chart_set_div_line_count(c, 7, 5);
+    lv_chart_set_axis_tick(c, LV_CHART_AXIS_PRIMARY_Y, 6, 3, 7, 1, true, tickLabelSize);
+    lv_chart_set_axis_tick(c, LV_CHART_AXIS_SECONDARY_Y, 6, 3, 7, 1, true, tickLabelSize);
     lv_chart_set_axis_tick(c, LV_CHART_AXIS_PRIMARY_X, 6, 3, 5, 2, false, 10);
     lv_obj_set_style_bg_color(c, col::bg(), 0);
     lv_obj_set_style_border_color(c, col::grid(), 0);
@@ -326,10 +444,9 @@ lv_obj_t* mkChart(lv_obj_t* parent, int wd, int ht, const lv_font_t* tickFont, i
 
 void onSeriesToggle(lv_event_t* e) {
     int bit = (int)(intptr_t)lv_event_get_user_data(e);
-    bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
-    if (on) g_settings.chartMask |= (1 << bit);
-    else    g_settings.chartMask &= ~(1 << bit);
+    g_settings.chartMask ^= (1 << bit);
     g_settings.save();
+    applySeriesButtons();
     rebuildChart();
 }
 
@@ -360,6 +477,11 @@ void cycleChartRange() {
 
 void settingsChanged() {
     setCapacityLabel();
+    setTimeoutLabel();
+    if (w.swRelayPhone) {
+        if (g_settings.relayFollowsPhone) lv_obj_add_state(w.swRelayPhone, LV_STATE_CHECKED);
+        else lv_obj_clear_state(w.swRelayPhone, LV_STATE_CHECKED);
+    }
     if (w.sliderBright) lv_slider_set_value(w.sliderBright, g_settings.brightness, LV_ANIM_OFF);
     if (w.swFahrenheit) {
         if (g_settings.fahrenheit) lv_obj_add_state(w.swFahrenheit, LV_STATE_CHECKED);
@@ -382,8 +504,8 @@ static void onTileChanged(lv_event_t*) {
 void nextPage() {
     lv_obj_t* act = lv_tileview_get_tile_act(tv);
     int i = 0;
-    for (; i < 4; i++) if (pages[i] == act) break;
-    i = (i + 1) % 4;
+    for (; i < NPAGES; i++) if (pages[i] == act) break;
+    i = (i + 1) % NPAGES;
     lv_obj_set_tile(tv, pages[i], LV_ANIM_ON);
     chartVisible = (i == PAGE_CHART);
     if (chartVisible) rebuildChart();
@@ -398,9 +520,9 @@ void create() {
     lv_obj_set_scrollbar_mode(tv, LV_SCROLLBAR_MODE_OFF);
 
     pages[0] = lv_tileview_add_tile(tv, 0, 0, LV_DIR_RIGHT);
-    pages[1] = lv_tileview_add_tile(tv, 1, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
-    pages[2] = lv_tileview_add_tile(tv, 2, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
-    pages[3] = lv_tileview_add_tile(tv, 3, 0, LV_DIR_LEFT);
+    for (int i = 1; i < NPAGES - 1; i++)
+        pages[i] = lv_tileview_add_tile(tv, i, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
+    pages[NPAGES - 1] = lv_tileview_add_tile(tv, NPAGES - 1, 0, LV_DIR_LEFT);
     for (lv_obj_t* p : pages) {
         lv_obj_set_style_bg_color(p, col::bg(), 0);
         lv_obj_clear_flag(p, LV_OBJ_FLAG_SCROLLABLE);
@@ -410,22 +532,44 @@ void create() {
     layout::halo(pages[0]);
     layout::chart(pages[1]);
     layout::detail(pages[2]);
-    layout::setup(pages[3]);
+    layout::phones(pages[3]);
+    layout::setup(pages[4]);
 
     applyRangeButtons();
     applySeriesButtons();
     setCapacityLabel();
+    setTimeoutLabel();
     rebuildChart();
 }
 
 // ---------------------------------------------------------------------------
 // Update
 // ---------------------------------------------------------------------------
-static void setText(lv_obj_t* o, const char* t) { if (o) lv_label_set_text(o, t); }
-static void setColor(lv_obj_t* o, lv_color_t c) { if (o) lv_obj_set_style_text_color(o, c, 0); }
+// Change-only setters: an unchanged label must not invalidate the screen.
+static void setText(lv_obj_t* o, const char* t) {
+    if (o && strcmp(lv_label_get_text(o), t) != 0) lv_label_set_text(o, t);
+}
+static void setColor(lv_obj_t* o, lv_color_t c) {
+    if (o && lv_color_to16(lv_obj_get_style_text_color(o, 0)) != lv_color_to16(c))
+        lv_obj_set_style_text_color(o, c, 0);
+}
+static void setBgColor(lv_obj_t* o, lv_color_t c, lv_style_selector_t sel) {
+    if (o && lv_color_to16(lv_obj_get_style_bg_color(o, sel)) != lv_color_to16(c))
+        lv_obj_set_style_bg_color(o, c, sel);
+}
+static void setArcColor(lv_obj_t* o, lv_color_t c) {
+    if (o && lv_color_to16(lv_obj_get_style_arc_color(o, LV_PART_INDICATOR)) != lv_color_to16(c))
+        lv_obj_set_style_arc_color(o, c, LV_PART_INDICATOR);
+}
+static void setHidden(lv_obj_t* o, bool hidden) {
+    if (!o) return;
+    if (hidden != lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN)) {
+        if (hidden) lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); else lv_obj_clear_flag(o, LV_OBJ_FLAG_HIDDEN);
+    }
+}
 
 void update(const State& s) {
-    char buf[80];
+    char buf[160];
 
     // ---- Halo page ----
     setText(w.lblName, s.deviceName[0] ? s.deviceName : "BatMon");
@@ -436,19 +580,19 @@ void update(const State& s) {
     if (s.soc >= 0) {
         snprintf(buf, sizeof buf, "%.0f", s.soc);
         setText(w.lblSoc, buf);
-        if (w.lblSocUnit) lv_obj_clear_flag(w.lblSocUnit, LV_OBJ_FLAG_HIDDEN);
+        setHidden(w.lblSocUnit, false);
         lv_color_t gc = vStale ? col::stale() : socColor(s.soc);
         if (w.arc) {
             lv_arc_set_value(w.arc, (int)lroundf(s.soc));
-            lv_obj_set_style_arc_color(w.arc, gc, LV_PART_INDICATOR);
+            setArcColor(w.arc, gc);
         }
         if (w.bar) {
             lv_bar_set_value(w.bar, (int)lroundf(s.soc), LV_ANIM_OFF);
-            lv_obj_set_style_bg_color(w.bar, gc, LV_PART_INDICATOR);
+            setBgColor(w.bar, gc, LV_PART_INDICATOR);
         }
     } else {
         setText(w.lblSoc, "--");
-        if (w.lblSocUnit) lv_obj_add_flag(w.lblSocUnit, LV_OBJ_FLAG_HIDDEN);
+        setHidden(w.lblSocUnit, true);
         if (w.arc) lv_arc_set_value(w.arc, 0);
         if (w.bar) lv_bar_set_value(w.bar, 0, LV_ANIM_OFF);
     }
@@ -511,7 +655,7 @@ void update(const State& s) {
                 c = col::bad();
             }
         }
-        lv_obj_set_style_text_color(w.lblCharge, c, 0);
+        setColor(w.lblCharge, c);
     }
 
     // Link status: green only when connected with fresh data, else red
@@ -519,14 +663,16 @@ void update(const State& s) {
     setColor(w.lblBt, linked ? col::good() : col::bad());
     if (linked) board::setStatusLed(0, 255, 0);
     else if (s.link == LinkState::Paused) board::setStatusLed(0, 0, 255);
+    else if (s.link == LinkState::Standby) board::setStatusLed(0, 0, 0);
     else board::setStatusLed(255, 0, 0);
+    if (s.link == LinkState::Standby) setText(w.lblRuntime, "Standby: no phone present");
 
     bool relayOn = s.relay.valid() && s.relay.value > 0.5f;
     bool swOn = s.sw.valid() && s.sw.value > 0.5f;
     if (w.lblRelayState) {
         snprintf(buf, sizeof buf, "Relay %s", s.relay.valid() ? (relayOn ? "ON" : "OFF") : "--");
-        lv_label_set_text(w.lblRelayState, buf);
-        lv_obj_set_style_text_color(w.lblRelayState, relayOn ? col::accent() : col::dim(), 0);
+        setText(w.lblRelayState, buf);
+        setColor(w.lblRelayState, relayOn ? col::accent() : col::dim());
     }
 
     // ---- Detail page ----
@@ -534,8 +680,8 @@ void update(const State& s) {
         if (!w.detVal[r]) return;
         if (rd.valid()) snprintf(buf, sizeof buf, f, rd.value * scale);
         else snprintf(buf, sizeof buf, "--");
-        lv_label_set_text(w.detVal[r], buf);
-        lv_obj_set_style_text_color(w.detVal[r], stale(rd) ? col::stale() : col::text(), 0);
+        setText(w.detVal[r], buf);
+        setColor(w.detVal[r], stale(rd) ? col::stale() : col::text());
     };
     fmt(D_VOLTS, s.volts, "%.2f V");
     fmt(D_EXT_VOLTS, s.extVolts, "%.2f V");
@@ -566,18 +712,22 @@ void update(const State& s) {
         snprintf(buf, sizeof buf, "Relay %s    Switch %s",
                  s.relay.valid() ? (relayOn ? "ON" : "OFF") : "--",
                  s.sw.valid() ? (swOn ? "ON" : "OFF") : "--");
-        lv_label_set_text(w.lblIoState, buf);
+        setText(w.lblIoState, buf);
     }
 
     // Reflect the device's real pin state without firing our own handlers.
     if ((int32_t)(millis() - switchHoldUntilMs) >= 0) {
         suppressSwitchEvents = true;
         if (w.swSwitch) {
-            if (swOn) lv_obj_add_state(w.swSwitch, LV_STATE_CHECKED); else lv_obj_clear_state(w.swSwitch, LV_STATE_CHECKED);
+            if (swOn != lv_obj_has_state(w.swSwitch, LV_STATE_CHECKED)) {
+                if (swOn) lv_obj_add_state(w.swSwitch, LV_STATE_CHECKED); else lv_obj_clear_state(w.swSwitch, LV_STATE_CHECKED);
+            }
         }
         for (lv_obj_t* o : {w.swRelay, w.swHaloRelay}) {
             if (!o) continue;
-            if (relayOn) lv_obj_add_state(o, LV_STATE_CHECKED); else lv_obj_clear_state(o, LV_STATE_CHECKED);
+            if (relayOn != lv_obj_has_state(o, LV_STATE_CHECKED)) {
+                if (relayOn) lv_obj_add_state(o, LV_STATE_CHECKED); else lv_obj_clear_state(o, LV_STATE_CHECKED);
+            }
         }
         suppressSwitchEvents = false;
     }
@@ -585,15 +735,92 @@ void update(const State& s) {
     // ---- Chart page ----
     if (chartVisible && millis() - lastChartMs >= CHART_REFRESH_MS) rebuildChart();
 
+    // ---- Phones page ----
+    int nPhones = presence::count();
+    if (lastPhoneCount >= 0 && nPhones > lastPhoneCount) {
+        // A phone just paired: ask for its name (touch layouts only).
+        openNameDialog(nPhones - 1);
+    }
+    lastPhoneCount = nPhones;
+    if (w.phoneRows[0]) {
+        for (int i = 0; i < 8; i++) {
+            if (!w.phoneRows[i]) continue;
+            if (i < nPhones) {
+                const presence::Phone& p = presence::phone(i);
+                if (presence::present(i)) snprintf(buf, sizeof buf, "%s   %d dBm", p.name, p.rssi);
+                else snprintf(buf, sizeof buf, "%s   away", p.name);
+                setText(lv_obj_get_child(w.phoneRows[i], 0), buf);
+                setColor(lv_obj_get_child(w.phoneRows[i], 0), presence::present(i) ? col::good() : col::dim());
+                setHidden(w.phoneRows[i], false);
+            } else {
+                setHidden(w.phoneRows[i], true);
+            }
+        }
+        if (selectedPhone >= nPhones) { selectedPhone = -1; applyPhoneSelection(); }
+    }
+    if (w.lblPhones) {
+        char list[MAX_PHONE_LIST];
+        int n = presence::count();
+        if (n == 0) {
+            snprintf(list, sizeof list, "No phones paired.\nThe display works normally.");
+        } else {
+            size_t used = 0;
+            for (int i = 0; i < n && used < sizeof list - 1; i++) {
+                const presence::Phone& p = presence::phone(i);
+                bool here = presence::present(i);
+                int wrote;
+                if (here)
+                    wrote = snprintf(list + used, sizeof list - used, "%s%s  %d dBm", used ? "\n" : "",
+                                     p.name, p.rssi);
+                else
+                    wrote = snprintf(list + used, sizeof list - used, "%s%s  away", used ? "\n" : "", p.name);
+                if (wrote > 0) used += wrote;
+            }
+        }
+        setText(w.lblPhones, list);
+    }
+    if (w.lblPairStatus) {
+        if (nPhones == 0 && !presence::pairing()) {
+            snprintf(buf, sizeof buf, "No phones paired: the display works normally.");
+        } else if (presence::pairing()) {
+            uint32_t left = presence::pairingRemainingMs() / 1000;
+            snprintf(buf, sizeof buf, "Pairing: %lu:%02lu left. On the phone open nRF Connect,\n"
+                     "connect to 'BatMon Display' and read the characteristic.",
+                     (unsigned long)left / 60, (unsigned long)left % 60);
+        } else {
+            snprintf(buf, sizeof buf, "Screen and BatMon link stay off until a paired phone is near.");
+        }
+        setText(w.lblPairStatus, buf);
+    }
+    // Phone icon on the Halo page: blue = open mode (no phones paired),
+    // green = a paired phone is here, red = none here.
+    if (w.lblPhoneIcon) {
+        setHidden(w.lblPhoneIcon, false);
+        if (nPhones == 0) {
+            setColor(w.lblPhoneIcon, col::charge());
+            setHidden(w.lblPhoneName, true);
+        } else {
+            int near = presence::nearestPresent();
+            setColor(w.lblPhoneIcon, near >= 0 ? col::good() : col::bad());
+            if (w.lblPhoneName) {
+                setHidden(w.lblPhoneName, false);
+                setText(w.lblPhoneName, presence::phone(near >= 0 ? near : 0).name);
+                setColor(w.lblPhoneName, near >= 0 ? col::text() : col::dim());
+            }
+        }
+    }
+    setText(w.btnPairLbl, presence::pairing() ? "Stop pairing" : "Pair new phone");
+
     // ---- Setup page ----
     setText(w.btnPauseLbl, s.link == LinkState::Paused ? "Resume BLE" : "Pause BLE 5 min");
     if (w.lblSetupInfo) {
         char cap[24];
         if (g_settings.capacityAh > 0) snprintf(cap, sizeof cap, "%.0f Ah", g_settings.capacityAh);
         else snprintf(cap, sizeof cap, "not set");
-        snprintf(buf, sizeof buf, "Capacity %s   Bright %u%%   %s   Poll %u ms",
-                 cap, g_settings.brightness, g_settings.fahrenheit ? "F" : "C", g_settings.pollMs);
-        lv_label_set_text(w.lblSetupInfo, buf);
+        snprintf(buf, sizeof buf, "Capacity %s   Bright %u%%   %s   Poll %u ms   Relay follows phone: %s",
+                 cap, g_settings.brightness, g_settings.fahrenheit ? "F" : "C", g_settings.pollMs,
+                 g_settings.relayFollowsPhone ? "on" : "off");
+        setText(w.lblSetupInfo, buf);
     }
 }
 
