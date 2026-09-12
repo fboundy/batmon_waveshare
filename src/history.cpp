@@ -140,7 +140,7 @@ static void saveTask(void*) {
                   writeAll(f, stage1, T1_CAP * sizeof(Sample));
         if (f) f.close();
         if (ok) {
-            LittleFS.remove(FILE_PATH);
+            if (LittleFS.exists(FILE_PATH)) LittleFS.remove(FILE_PATH);
             ok = LittleFS.rename(TEMP_PATH, FILE_PATH);
         }
         if (ok) {

@@ -124,6 +124,12 @@ continue on another machine. Newest entries at the bottom.
   turned into NaN gap samples. No RTC battery -> after a power loss the gap
   is unknown and assumed zero.
 - Details page shows time since the last save.
+- **Verified on the board:** first save `saved 20+0 samples in 3329 ms`;
+  after a reflash `restored 20+0 samples, gap 105 s` (RTC measured the
+  downtime) and the next save reported `47+1` = 20 restored + 7 gap + 20
+  new, with the first tier-1 sample. A ~200 KB LittleFS write takes ~3.3 s
+  on the background task; polling is unaffected.
+- Rotation and page order not visually checked yet (no photo).
 
 ### Not yet done
 - Real time on the chart axis needs a time source; see roadmap.
