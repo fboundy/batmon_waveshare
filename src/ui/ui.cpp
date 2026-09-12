@@ -492,17 +492,26 @@ void update(const State& s) {
         setText(w.lblRuntime, "");
     }
 
-    // Alert: aux battery is being charged but the main one is not.
-    bool alert = !stale(s.extVolts) && !stale(s.current) &&
-                 s.extVolts.value > ALERT_AUX_CHARGING_V &&
-                 s.current.value < ALERT_MAIN_CHARGING_A;
-    if (w.lblAlert) {
-        if (alert) {
-            lv_label_set_text(w.lblAlert, LV_SYMBOL_WARNING " Aux charging, main is not");
-            lv_obj_clear_flag(w.lblAlert, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_add_flag(w.lblAlert, LV_OBJ_FLAG_HIDDEN);
+    // Charge icon: is a charger running (aux voltage), and is the main
+    // battery getting any of it?
+    //   blue    aux < 13.2 V                     nothing charging
+    //   green   aux >= 13.2 V and main current +  main charging
+    //   yellow  aux >= 13.2 V, main not charging, but main is full (SoC > 95 % or > 14.4 V)
+    //   red     aux >= 13.2 V, main not charging and not full  -> split charge / DC-DC fault
+    if (w.lblCharge) {
+        lv_color_t c = col::dim();
+        if (!stale(s.extVolts)) {
+            if (s.extVolts.value < CHG_AUX_CHARGING_V) {
+                c = col::charge();
+            } else if (!stale(s.current) && s.current.value > CHG_MAIN_CURRENT_A) {
+                c = col::good();
+            } else if (s.soc > CHG_FULL_SOC || (s.volts.valid() && s.volts.value > CHG_FULL_MAIN_V)) {
+                c = col::warn();
+            } else {
+                c = col::bad();
+            }
         }
+        lv_obj_set_style_text_color(w.lblCharge, c, 0);
     }
 
     // Link status: green only when connected with fresh data, else red

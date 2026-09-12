@@ -27,9 +27,13 @@ void halo(lv_obj_t* page) {
     lv_obj_set_pos(w.lblName, 8, 4);
     lv_label_set_text(w.lblName, "BatMon");
 
-    w.lblBt = mkLabel(page, &lv_font_montserrat_16, col::bad());
+    // Status icons top right: charge state, Bluetooth link
+    w.lblBt = mkLabel(page, &lv_font_montserrat_24, col::bad());
     lv_label_set_text(w.lblBt, LV_SYMBOL_BLUETOOTH);
-    lv_obj_align(w.lblBt, LV_ALIGN_TOP_RIGHT, -8, 2);
+    lv_obj_align(w.lblBt, LV_ALIGN_TOP_RIGHT, -8, 0);
+    w.lblCharge = mkLabel(page, &lv_font_montserrat_24, col::dim());
+    lv_label_set_text(w.lblCharge, LV_SYMBOL_CHARGE);
+    lv_obj_align(w.lblCharge, LV_ALIGN_TOP_RIGHT, -40, 0);
 
     // SoC bar: 8..232, with the percentage to its right
     w.bar = lv_bar_create(page);
@@ -82,10 +86,6 @@ void halo(lv_obj_t* page) {
     lv_obj_align(w.lblRelayState, LV_ALIGN_TOP_RIGHT, -8, 126);
     lv_label_set_text(w.lblRelayState, "Relay --");
 
-    w.lblAlert = mkLabel(page, &lv_font_montserrat_14, col::bad());
-    lv_obj_align(w.lblAlert, LV_ALIGN_BOTTOM_MID, 0, -4);
-    lv_label_set_text(w.lblAlert, "");
-    lv_obj_add_flag(w.lblAlert, LV_OBJ_FLAG_HIDDEN);
 }
 
 // ---------------------------------------------------------------------------

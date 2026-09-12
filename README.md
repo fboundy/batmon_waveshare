@@ -13,8 +13,8 @@ It connects to a BatMon over Bluetooth LE, stays connected, and shows:
 
 * State of charge (270° ring + %), main and aux battery voltage, current with
   charge/discharge direction, power, battery temperature, time to empty /
-  full, a **relay output** toggle, and an alert when the aux battery is
-  charging but the main one is not
+  full, a **relay output** toggle, and a colour-coded charge-status icon
+  (spots a split-charge relay or DC-DC charger that isn't delivering)
 * A details page with every raw reading and **relay / switch control**
 * A chart page: main V / aux V / SoC / current over the last hour, day, week
   or month, scrollable; history is saved to flash every five minutes

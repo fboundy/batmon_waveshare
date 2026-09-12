@@ -51,8 +51,8 @@ struct Widgets {
     lv_obj_t* lblRuntime = nullptr;
     lv_obj_t* swHaloRelay = nullptr;     // touch boards
     lv_obj_t* lblRelayState = nullptr;   // touch-less boards: "Relay ON"
-    lv_obj_t* lblAlert = nullptr;
-    lv_obj_t* lblBt = nullptr;
+    lv_obj_t* lblBt = nullptr;       // Bluetooth glyph, green/red
+    lv_obj_t* lblCharge = nullptr;   // charge glyph, blue/green/yellow/red
     // Details
     lv_obj_t* detVal[D_COUNT] = {};
     lv_obj_t* swRelay = nullptr;

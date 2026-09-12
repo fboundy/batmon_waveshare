@@ -40,9 +40,11 @@
 #define HISTORY_SAVE_MS           (5 * 60 * 1000)   // flush history to LittleFS
 #define UI_REFRESH_MS             250
 #define CHART_REFRESH_MS          5000
-// Alert: aux battery is on charge but the main battery is not
-#define ALERT_AUX_CHARGING_V      13.0f
-#define ALERT_MAIN_CHARGING_A     0.2f
+// Charge-status icon (see docs/03-architecture.md, "Charge icon")
+#define CHG_AUX_CHARGING_V        13.2f   // aux above this = a charger is running
+#define CHG_MAIN_CURRENT_A        0.05f   // main current above this = charging
+#define CHG_FULL_SOC              95.0f   // main considered full: no charge expected
+#define CHG_FULL_MAIN_V           14.4f
 #define DATA_STALE_MS             10000  // grey-out readings older than this
 
 // Button timing

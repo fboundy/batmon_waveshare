@@ -87,8 +87,9 @@ All tunables are in `src/config.h`:
 | `CHART_REFRESH_MS` | 5000 | how often the chart page redraws while visible |
 | `HISTORY_SAVE_MS` | 300000 | how often the history buffers are written to LittleFS |
 | `LCD_ROTATE_180` | 1 | rotate UI and touch by 180° (board mounted USB-up) |
-| `ALERT_AUX_CHARGING_V` | 13.0 | aux voltage above which "aux is charging" |
-| `ALERT_MAIN_CHARGING_A` | 0.2 | main current below which "main is not charging" |
+| `CHG_AUX_CHARGING_V` | 13.2 | aux voltage above which a charger is considered running |
+| `CHG_MAIN_CURRENT_A` | 0.05 | main current above which the main is charging |
+| `CHG_FULL_SOC` / `CHG_FULL_MAIN_V` | 95 % / 14.4 V | main considered full (charge icon yellow instead of red) |
 | `BLE_PAUSE_DEFAULT_MS` | 300000 | "Pause BLE" duration |
 | `DATA_STALE_MS` | 10000 | readings older than this are greyed out |
 | `BL_DEFAULT_PERCENT` | 80 | backlight until the saved setting is loaded |

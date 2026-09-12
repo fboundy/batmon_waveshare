@@ -38,7 +38,7 @@ void halo(lv_obj_t* page) {
     lv_label_set_text(w.lblName, "BatMon");
 
     // Vertical layout (centre-relative): SoC -108, volts -36, A/W +14,
-    // temp +50, runtime +78, switch +124, alert +166, Bluetooth +196.
+    // temp +50, runtime +78, relay +124, status icons +192.
 
     // SoC: 72 px digits + 32 px unit on a shared baseline
     lv_obj_t* rowSoc = mkRow(page, 6);
@@ -93,16 +93,13 @@ void halo(lv_obj_t* page) {
     lv_obj_set_style_bg_color(w.swHaloRelay, col::accent(), LV_PART_INDICATOR | LV_STATE_CHECKED);
     lv_obj_add_event_cb(w.swHaloRelay, onSwitchRelay, LV_EVENT_VALUE_CHANGED, nullptr);
 
-    // Alert line (hidden unless active)
-    w.lblAlert = mkLabel(page, &lv_font_montserrat_18, col::bad());
-    lv_obj_align(w.lblAlert, LV_ALIGN_CENTER, 0, 166);
-    lv_label_set_text(w.lblAlert, "");
-    lv_obj_add_flag(w.lblAlert, LV_OBJ_FLAG_HIDDEN);
-
-    // Link status: Bluetooth glyph in the arc's bottom gap
-    w.lblBt = mkLabel(page, &lv_font_montserrat_28, col::bad());
+    // Status icons in the arc's bottom gap: Bluetooth link and charge state
+    w.lblBt = mkLabel(page, &lv_font_montserrat_42, col::bad());
     lv_label_set_text(w.lblBt, LV_SYMBOL_BLUETOOTH);
-    lv_obj_align(w.lblBt, LV_ALIGN_CENTER, 0, 196);
+    lv_obj_align(w.lblBt, LV_ALIGN_CENTER, -36, 192);
+    w.lblCharge = mkLabel(page, &lv_font_montserrat_42, col::dim());
+    lv_label_set_text(w.lblCharge, LV_SYMBOL_CHARGE);
+    lv_obj_align(w.lblCharge, LV_ALIGN_CENTER, 36, 192);
 }
 
 // ---------------------------------------------------------------------------

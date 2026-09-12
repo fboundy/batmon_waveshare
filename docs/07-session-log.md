@@ -156,5 +156,11 @@ continue on another machine. Newest entries at the bottom.
   <= 10 % (`socColor()` in `ui.cpp`, `lv_color_mix`).
 - Both envs build; 2.1 still off USB, flash pending.
 
+- Alert text replaced by a **charge-status bolt** next to the Bluetooth
+  glyph: blue (aux < 13.2 V), green (main charging), yellow (charger on
+  but main full: SoC > 95 % or > 14.4 V), red (charger on, main not
+  charging). Both icons 42 px on the round board, 24 px on the 1.9.
+  Thresholds `CHG_*` in config.h.
+
 ### Not yet done
 - Real time on the chart axis needs a time source; see roadmap.

@@ -30,9 +30,10 @@ Already implemented:
 * **Second battery voltage** (BatMon's external voltage input) on the main
   page, labelled Main / Aux.
 * **Relay output toggle** on the main page; both relay and switch on the Details page.
-* **Charge-mismatch alert** on the main page when the aux battery is being
-  charged (> 13.0 V) but the main battery is not (current < 0.2 A) — e.g.
-  a split-charge relay or DC-DC charger not engaging.
+* **Charge-status icon** on the main page: blue = no charger, green = main
+  charging, yellow = charger running but main already full, red = charger
+  running and main not charging (split-charge relay / DC-DC charger not
+  engaging).
 * **History chart page** — Main V, Aux V, SoC and current over the last
   Hour / Day / Week / Month, scrollable back through 24 h of 15 s samples and
   30 days of 6 min samples, saved to flash every 5 minutes so it survives

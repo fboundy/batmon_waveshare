@@ -158,13 +158,29 @@ round panel (roughly a 440 px diameter).
 
 | Tile | Contents |
 |---|---|
-| Halo (round) | 270° SoC arc coloured by SoC (green at >= 90 %, fading to yellow at 50 % and red at <= 10 %); 72 px SoC digits with a 32 px unit on a shared baseline; **Main** and **Aux** voltages (40 px, 28 px units) side by side; current with charge/discharge arrow (blue = charging, amber = discharging); power; external temperature; time-to-empty/full; large **Relay** output toggle (the switch stays on Details); red **charge-mismatch alert** (aux > 13.0 V while main current < 0.2 A); Bluetooth glyph in the arc's gap, green when connected with fresh data, red otherwise |
-| Halo (wide) | horizontal SoC **bar** coloured the same way, 28 px SoC %, Main/Aux voltages, current/power/temperature, runtime, "Relay ON/OFF" text, alert line, Bluetooth glyph |
+| Halo (round) | 270° SoC arc coloured by SoC (green at >= 90 %, fading to yellow at 50 % and red at <= 10 %); 72 px SoC digits with a 32 px unit on a shared baseline; **Main** and **Aux** voltages (40 px, 28 px units) side by side; current with charge/discharge arrow (blue = charging, amber = discharging); power; external temperature; time-to-empty/full; large **Relay** output toggle (the switch stays on Details); Bluetooth and charge-status glyphs (42 px) in the arc's gap |
+| Halo (wide) | horizontal SoC **bar** coloured the same way, 28 px SoC %, Main/Aux voltages, current/power/temperature, runtime, "Relay ON/OFF" text, Bluetooth and charge-status glyphs (24 px) top right |
 | Chart | line chart of Main V / Aux V / SoC / Amps (toggle buttons), **Hour / Day / Week / Month** range buttons and ◀ ▶ to scroll one range at a time. Left axis is volts (auto-ranged); right axis is SoC % when SoC is shown, otherwise amps (auto-ranged). When both SoC and amps are on, amps are scaled onto the SoC axis and the scale is printed under the chart |
 | Details | every raw reading, RSSI, poll counters, MAC, time since the last history save; **Relay** and **Switch** toggles |
 | Setup | capacity ±1/±10 Ah, brightness slider, °C/°F, **Pause BLE 5 min / Resume**, **Forget device**, firmware version |
 
 Readings older than 10 s are drawn grey so a frozen link is obvious.
+
+### Status icons
+
+Two glyphs sit together on the Halo page. **Bluetooth** is green when
+connected with fresh data, red otherwise. The **charge** bolt reports
+whether a charger is running and whether the main battery is getting any
+of it (thresholds are `CHG_*` in `config.h`):
+
+| Colour | Condition | Meaning |
+|---|---|---|
+| grey | aux voltage stale | unknown |
+| blue | aux < 13.2 V | no charger running |
+| green | aux ≥ 13.2 V and main current > +0.05 A | main charging |
+| yellow | aux ≥ 13.2 V, main not charging, but SoC > 95 % or main > 14.4 V | main is full, nothing to worry about |
+| red | aux ≥ 13.2 V, main not charging and not full | split-charge relay / DC-DC charger not delivering |
+
 Baseline alignment between different font sizes in one row is done by
 translating the smaller label up by the difference of the fonts'
 `base_line` values (see `buildHalo()`).
