@@ -79,6 +79,10 @@ struct Widgets {
     lv_obj_t* lblPairStatus = nullptr;
     lv_obj_t* btnPairLbl = nullptr;      // label inside the Pair button
     lv_obj_t* lblTimeout = nullptr;      // "Away after 90 s"
+    // Beacon picker (touch layout)
+    lv_obj_t* beaconDlg = nullptr;
+    lv_obj_t* beaconRows[6] = {};
+    lv_obj_t* lblBeaconStatus = nullptr;
     // Name dialog (touch layout): shown after a pairing and for Rename
     lv_obj_t* nameDlg = nullptr;
     lv_obj_t* nameTitle = nullptr;
@@ -124,6 +128,9 @@ void onPhoneRow(lv_event_t* e);       // user data: phone index; selects it
 void onRenamePhone(lv_event_t* e);    // opens the name dialog for the selection
 void onDeletePhone(lv_event_t* e);
 void onNameKeyboard(lv_event_t* e);   // LV_EVENT_READY / LV_EVENT_CANCEL from the keyboard
+void onAddBeacon(lv_event_t* e);      // opens the picker and starts a discovery window
+void onBeaconRow(lv_event_t* e);      // user data: candidate index
+void onBeaconCancel(lv_event_t* e);
 void onTimeout(lv_event_t* e);        // user data: delta seconds
 void setTimeoutLabel();
 

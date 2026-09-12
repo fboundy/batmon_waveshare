@@ -277,6 +277,26 @@ void onTimeout(lv_event_t* e) {
     setTimeoutLabel();
 }
 
+void onAddBeacon(lv_event_t*) {
+    if (!w.beaconDlg) return;
+    presence::startBeaconScan(20000);
+    for (lv_obj_t* r : w.beaconRows) if (r) lv_obj_add_flag(r, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(w.beaconDlg, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(w.beaconDlg);
+}
+
+void onBeaconCancel(lv_event_t*) {
+    if (w.beaconDlg) lv_obj_add_flag(w.beaconDlg, LV_OBJ_FLAG_HIDDEN);
+}
+
+void onBeaconRow(lv_event_t* e) {
+    int c = (int)(intptr_t)lv_event_get_user_data(e);
+    int idx = presence::addBeacon(c, nullptr);
+    if (w.beaconDlg) lv_obj_add_flag(w.beaconDlg, LV_OBJ_FLAG_HIDDEN);
+    lastPhoneCount = presence::count();   // don't let the "new pairing" check open it twice
+    if (idx >= 0) openNameDialog(idx);
+}
+
 void onNameKeyboard(lv_event_t* e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_READY && namingPhone >= 0) {
@@ -747,6 +767,29 @@ void update(const State& s) {
     // ---- Chart page ----
     if (chartVisible && millis() - lastChartMs >= CHART_REFRESH_MS) rebuildChart();
 
+    // ---- Beacon picker ----
+    if (w.beaconDlg && !lv_obj_has_flag(w.beaconDlg, LV_OBJ_FLAG_HIDDEN)) {
+        int nc = presence::candidateCount();
+        for (int i = 0; i < 6; i++) {
+            if (!w.beaconRows[i]) continue;
+            if (i < nc) {
+                const presence::BeaconCandidate& c = presence::candidate(i);
+                char hex[37];
+                presence::formatUuid(c.uuid, hex);
+                snprintf(buf, sizeof buf, "%.8s..  %u / %u   %d dBm", hex, c.major, c.minor, c.rssi);
+                setText(lv_obj_get_child(w.beaconRows[i], 0), buf);
+                setHidden(w.beaconRows[i], false);
+            } else {
+                setHidden(w.beaconRows[i], true);
+            }
+        }
+        if (presence::beaconScanning())
+            snprintf(buf, sizeof buf, "Listening for iBeacons... %d found. Tap one to add it.", nc);
+        else
+            snprintf(buf, sizeof buf, "%s", nc ? "Tap a beacon to add it, or Cancel." : "No iBeacons heard. Check the tag is on and set to iBeacon.");
+        setText(w.lblBeaconStatus, buf);
+    }
+
     // ---- Phones page ----
     int nPhones = presence::count();
     if (lastPhoneCount >= 0 && nPhones > lastPhoneCount) {
@@ -759,8 +802,9 @@ void update(const State& s) {
             if (!w.phoneRows[i]) continue;
             if (i < nPhones) {
                 const presence::Phone& p = presence::phone(i);
-                if (presence::present(i)) snprintf(buf, sizeof buf, "%s   %d dBm", p.name, p.rssi);
-                else snprintf(buf, sizeof buf, "%s   away", p.name);
+                const char* kind = p.isBeacon ? LV_SYMBOL_GPS " " : "";
+                if (presence::present(i)) snprintf(buf, sizeof buf, "%s%s   %d dBm", kind, p.name, p.rssi);
+                else snprintf(buf, sizeof buf, "%s%s   away", kind, p.name);
                 setText(lv_obj_get_child(w.phoneRows[i], 0), buf);
                 setColor(lv_obj_get_child(w.phoneRows[i], 0), presence::present(i) ? col::good() : col::dim());
                 setHidden(w.phoneRows[i], false);

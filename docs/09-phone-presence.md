@@ -114,3 +114,25 @@ NimBLE's.
 - Show presence on the Halo page (small phone glyph per phone).
 - RSSI threshold per phone (only "present" when close).
 - Auto-pause the BatMon link when a phone that runs the BatMon app is here.
+
+## iBeacon tags
+
+Any configurable iBeacon (tested design target: DX-CP27, DA14531-based,
+1-year CR-cell, IP67) can stand in for a phone. Beacons are matched by their
+**proximity UUID** plus major/minor (either can be "any"), so a tag you
+configured yourself cannot collide with anyone else's. They live in the same
+list as phones and get the same timeout, debounce, standby, relay-follow,
+rename and delete; the Phones page marks them with a pin glyph.
+
+Adding one (round board): Phones page -> **Add beacon** -> the display
+listens for 20 s and lists every iBeacon it hears (UUID prefix, major/minor,
+RSSI, strongest first as heard) -> tap one -> name it. Serial:
+`beacon scan`, then `beacon list`, then `beacon add <n> [name]`, or directly
+`beacon add <uuid> [major] [minor] [name]`.
+
+On the tag: set the advertising interval to 500-1000 ms (fast enough to be
+seen within a few seconds, kind to the battery) and a middle TX power so
+"present" means "in the vehicle". Stored in NVS namespace `beacons`.
+
+A beacon is easier to spoof than a bonded phone (its UUID is broadcast in
+clear); fine for a van display, not for anything security-relevant.

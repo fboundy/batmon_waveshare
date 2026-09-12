@@ -226,9 +226,11 @@ void phones(lv_obj_t* page) {
         w.phoneRows[i] = b;
     }
 
-    lv_obj_t* bp = mkButton(page, "Pair new phone", 300, 36, onPairPhone, nullptr);
-    lv_obj_align(bp, LV_ALIGN_TOP_MID, 0, 194);
+    lv_obj_t* bp = mkButton(page, "Pair phone", 145, 36, onPairPhone, nullptr);
+    lv_obj_align(bp, LV_ALIGN_TOP_MID, -78, 194);
     w.btnPairLbl = lv_obj_get_child(bp, 0);
+    lv_obj_t* bb = mkButton(page, "Add beacon", 145, 36, onAddBeacon, nullptr);
+    lv_obj_align(bb, LV_ALIGN_TOP_MID, 78, 194);
 
     w.btnRename = mkButton(page, "Rename", 145, 36, onRenamePhone, nullptr);
     lv_obj_align(w.btnRename, LV_ALIGN_TOP_MID, -78, 236);
@@ -263,6 +265,31 @@ void phones(lv_obj_t* page) {
     lv_obj_set_style_text_align(w.lblPairStatus, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(w.lblPairStatus, LV_LABEL_LONG_WRAP);
     lv_obj_align(w.lblPairStatus, LV_ALIGN_TOP_MID, 0, 360);
+
+    // Beacon picker: full-screen overlay listing iBeacons heard
+    w.beaconDlg = lv_obj_create(lv_scr_act());
+    lv_obj_remove_style_all(w.beaconDlg);
+    lv_obj_set_size(w.beaconDlg, LCD_H_RES, LCD_V_RES);
+    lv_obj_set_style_bg_color(w.beaconDlg, col::bg(), 0);
+    lv_obj_set_style_bg_opa(w.beaconDlg, LV_OPA_COVER, 0);
+    lv_obj_clear_flag(w.beaconDlg, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(w.beaconDlg, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_t* bt = mkLabel(w.beaconDlg, &lv_font_montserrat_20, col::accent());
+    lv_label_set_text(bt, "Add beacon");
+    lv_obj_align(bt, LV_ALIGN_TOP_MID, 0, 50);
+    w.lblBeaconStatus = mkLabel(w.beaconDlg, &lv_font_montserrat_14, col::dim());
+    lv_obj_set_width(w.lblBeaconStatus, 320);
+    lv_obj_set_style_text_align(w.lblBeaconStatus, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(w.lblBeaconStatus, LV_LABEL_LONG_WRAP);
+    lv_obj_align(w.lblBeaconStatus, LV_ALIGN_TOP_MID, 0, 82);
+    for (int i = 0; i < 6; i++) {
+        lv_obj_t* b = mkButton(w.beaconDlg, "", 320, 34, onBeaconRow, (void*)(intptr_t)i, &lv_font_montserrat_14);
+        lv_obj_align(b, LV_ALIGN_TOP_MID, 0, 128 + i * 40);
+        lv_obj_add_flag(b, LV_OBJ_FLAG_HIDDEN);
+        w.beaconRows[i] = b;
+    }
+    lv_obj_t* bc = mkButton(w.beaconDlg, "Cancel", 160, 38, onBeaconCancel, nullptr);
+    lv_obj_align(bc, LV_ALIGN_BOTTOM_MID, 0, -56);
 
     // Name dialog: full-screen overlay on the screen (above the tileview)
     w.nameDlg = lv_obj_create(lv_scr_act());

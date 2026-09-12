@@ -185,7 +185,7 @@ void phones(lv_obj_t* page) {
     lv_obj_align(w.lblPairStatus, LV_ALIGN_BOTTOM_LEFT, 8, -20);
 
     lv_obj_t* help = mkLabel(page, &lv_font_montserrat_12, col::stale());
-    lv_label_set_text(help, "serial: phone pair | forget <n>|all | name <n> <name> | timeout <s>");
+    lv_label_set_text(help, "serial: phone pair|forget|name|timeout   beacon scan|add");
     lv_obj_align(help, LV_ALIGN_BOTTOM_LEFT, 8, -4);
 }
 

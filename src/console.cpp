@@ -1,6 +1,7 @@
 #include "console.h"
 
 #include <Arduino.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -43,6 +44,7 @@ static void help() {
         "  phone name <n> <name>\n"
         "  phone timeout <s>      away after this many seconds without an advert (15-600)\n"
         "  relayphone <0|1>       relay on when a phone arrives, off when the last leaves\n"
+        "  beacon scan|list|add   iBeacon tags: listen 20 s, list what was heard, add one (phone forget/name apply)\n"
         "  help");
 }
 
@@ -80,8 +82,15 @@ static void phoneList() {
     if (n == 0) Serial.println("no phones paired");
     for (int i = 0; i < n; i++) {
         const presence::Phone& p = presence::phone(i);
-        Serial.printf("  %d: %-15s %s  irk=%d  %s", i, p.name, p.addr, p.hasIrk,
-                      presence::present(i) ? "PRESENT" : "away");
+        if (p.isBeacon) {
+            char hex[37];
+            presence::formatUuid(p.uuid, hex);
+            Serial.printf("  %d: %-15s beacon %s %u/%u  %s", i, p.name, hex, p.major, p.minor,
+                          presence::present(i) ? "PRESENT" : "away");
+        } else {
+            Serial.printf("  %d: %-15s %s  irk=%d  %s", i, p.name, p.addr, p.hasIrk,
+                          presence::present(i) ? "PRESENT" : "away");
+        }
         if (p.lastSeenMs) Serial.printf("  (%lu s ago, %d dBm)", (unsigned long)((millis() - p.lastSeenMs) / 1000), p.rssi);
         Serial.println();
     }
@@ -200,6 +209,42 @@ static void execute(char* l) {
             else Serial.println("usage: phone name <n> <name>");
         } else {
             Serial.println("usage: phone list|pair|stop|forget <n|all>|name <n> <name>|timeout <s>");
+        }
+    } else if (!strcasecmp(cmd, "beacon")) {
+        if (!a1 || !strcasecmp(a1, "list")) {
+            int n = presence::candidateCount();
+            Serial.printf("%d iBeacon(s) heard%s\n", n, presence::beaconScanning() ? " (still listening)" : "");
+            for (int i = 0; i < n; i++) {
+                const presence::BeaconCandidate& c = presence::candidate(i);
+                char hex[37];
+                presence::formatUuid(c.uuid, hex);
+                Serial.printf("  %d: %s  major %u  minor %u  %d dBm\n", i, hex, c.major, c.minor, c.rssi);
+            }
+        } else if (!strcasecmp(a1, "scan")) {
+            presence::startBeaconScan(20000);
+            Serial.println("listening for iBeacons for 20 s; then 'beacon list' and 'beacon add <n> [name]'");
+        } else if (!strcasecmp(a1, "add") && a2) {
+            char* rest = strtok(nullptr, "");
+            int idx;
+            if (strlen(a2) >= 32) {
+                // beacon add <uuid> [major] [minor] [name]
+                uint16_t major = 0xFFFF, minor = 0xFFFF;
+                char* name = nullptr;
+                if (rest) {
+                    char* t1 = strtok(rest, " \t");
+                    char* t2 = t1 ? strtok(nullptr, " \t") : nullptr;
+                    char* t3 = t2 ? strtok(nullptr, "") : nullptr;
+                    if (t1 && isdigit((unsigned char)t1[0])) { major = atoi(t1); if (t2 && isdigit((unsigned char)t2[0])) { minor = atoi(t2); name = t3; } else name = t2; }
+                    else name = t1;
+                }
+                idx = presence::addBeacon(a2, major, minor, name);
+            } else {
+                idx = presence::addBeacon(atoi(a2), rest);
+            }
+            if (idx >= 0) { Serial.printf("added as entry %d '%s'\n", idx, presence::phone(idx).name); phoneList(); }
+            else Serial.println("could not add (bad uuid / unknown candidate / list full)");
+        } else {
+            Serial.println("usage: beacon scan | beacon list | beacon add <n|uuid> [major] [minor] [name]");
         }
     } else if (!strcasecmp(cmd, "relayphone") && onOff(a1, on)) {
         g_settings.relayFollowsPhone = on;

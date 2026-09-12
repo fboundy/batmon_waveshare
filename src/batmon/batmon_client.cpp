@@ -137,7 +137,8 @@ void Client::stopScan() {
 
 // NimBLE host task: every advertisement report.
 void Client::onResult(const NimBLEAdvertisedDevice* d) {
-    presence::onAdvert(d->getAddress(), d->getRSSI());
+    std::string mfg = d->getManufacturerData();
+    presence::onAdvert(d->getAddress(), d->getRSSI(), (const uint8_t*)mfg.data(), mfg.size());
 
     if (!isBatMon(d)) return;
     ESP_LOGD(TAG, "BatMon adv %s rssi=%d name='%s'", d->getAddress().toString().c_str(),

@@ -128,6 +128,7 @@ terminated). This is the only way to change settings on the touch-less
 | `page` | next page |
 | `phone list` / `phone pair` / `phone stop` / `phone forget <n\|all>` / `phone name <n> <name>` | phone presence, see [09-phone-presence.md](09-phone-presence.md) |
 | `relayphone 0\|1` | relay follows phone presence |
+| `beacon scan` / `beacon list` / `beacon add <n\|uuid> [major] [minor] [name]` | iBeacon tags as presence sources |
 | `help` | list |
 
 `pio device monitor` sends what you type when you press Enter.
