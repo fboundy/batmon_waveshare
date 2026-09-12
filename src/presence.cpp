@@ -177,6 +177,7 @@ void begin() {
         svc->createCharacteristic(CHR_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::READ_ENC);
     chr->setValue("paired");
     svc->start();
+    server->start();   // registers the services with the host; advertising asserts without it
 
     NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
     adv->setName(ADV_NAME);
