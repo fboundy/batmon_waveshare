@@ -92,7 +92,11 @@ static const InitCmd kInit[] = {
     {0xEF, 1, {0x08}},
     // Back to Command1
     {0xFF, 5, {0x77, 0x01, 0x00, 0x00, 0x00}},
+#if LCD_ROTATE_180 && LCD_ROTATE_180_HW
+    {0x36, 1, {0xC0}},                            // MADCTL: MY|MX = 180 degree turn
+#else
     {0x36, 1, {0x00}},                            // MADCTL
+#endif
     {0x3A, 1, {0x66}},                            // COLMOD: 18-bit RGB interface
     {0x11, 0, {}},                                // sleep out
     {0x00, 0xFF, {48}},                           // 480 ms

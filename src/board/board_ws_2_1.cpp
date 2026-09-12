@@ -32,8 +32,14 @@ static void waitVsync() {
 static bool touchRead(uint16_t& x, uint16_t& y) {
     TouchPoint tp = g_touch.read();
     if (!tp.pressed) return false;
+#if LCD_ROTATE_180 && LCD_ROTATE_180_HW
+    // Panel is flipped in hardware; the touch panel is not.
+    x = LCD_H_RES - 1 - tp.x;
+    y = LCD_V_RES - 1 - tp.y;
+#else
     x = tp.x;
     y = tp.y;
+#endif
     return true;
 }
 
@@ -58,7 +64,7 @@ bool init() {
     cfg.buf0 = g_display.frameBuffer(0);
     cfg.buf1 = g_display.frameBuffer(1);
     cfg.bufPixels = (size_t)LCD_H_RES * LCD_V_RES;
-    cfg.rotate180 = LCD_ROTATE_180;
+    cfg.rotate180 = LCD_ROTATE_180 && !LCD_ROTATE_180_HW;   // software flip only if the panel doesn't
     cfg.flush = flushFrame;
     cfg.waitVsync = waitVsync;
     cfg.touchRead = touchRead;

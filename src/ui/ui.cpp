@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "../batmon/batmon_client.h"
 #include "../board/board.h"
@@ -226,12 +227,36 @@ void onRenamePhone(lv_event_t*) {
     openNameDialog(selectedPhone);
 }
 
-void onDeletePhone(lv_event_t*) {
+static void doDeletePhone() {
     if (selectedPhone < 0) return;
     presence::forget(selectedPhone);
     selectedPhone = -1;
     lastPhoneCount = presence::count();   // a deletion is not a new pairing
     applyPhoneSelection();
+}
+
+static void onConfirmDelete(lv_event_t* e) {
+    lv_obj_t* mbox = lv_event_get_current_target(e);
+    const char* btn = lv_msgbox_get_active_btn_text(mbox);
+    if (btn && !strcmp(btn, "Delete")) doDeletePhone();
+    lv_msgbox_close(mbox);
+}
+
+void onDeletePhone(lv_event_t*) {
+    if (selectedPhone < 0) return;
+    if (presence::count() > 1) {
+        doDeletePhone();
+        return;
+    }
+    // Last phone: this switches the display back to "open" mode.
+    static const char* btns[] = {"Cancel", "Delete", ""};
+    lv_obj_t* mbox = lv_msgbox_create(nullptr, "Delete last phone?",
+                                      "With no phones paired the display reverts to Open mode: "
+                                      "always on and always connected to the BatMon.",
+                                      btns, false);
+    lv_obj_set_width(mbox, 320);
+    lv_obj_add_event_cb(mbox, onConfirmDelete, LV_EVENT_VALUE_CHANGED, nullptr);
+    lv_obj_center(mbox);
 }
 
 void setTimeoutLabel() {
@@ -312,25 +337,26 @@ static void rebuildChart() {
         if ((mask & 1) && !isnan(s.mainV)) { vmin = fminf(vmin, s.mainV); vmax = fmaxf(vmax, s.mainV); }
         if ((mask & 2) && !isnan(s.auxV))  { vmin = fminf(vmin, s.auxV);  vmax = fmaxf(vmax, s.auxV); }
     }
-    if (vmin > vmax) { vmin = 10.0f; vmax = 15.0f; }
-    vmin = floorf((vmin - 0.15f) * 2.0f) / 2.0f;
-    vmax = ceilf((vmax + 0.15f) * 2.0f) / 2.0f;
-    if (vmax - vmin < 1.0f) vmax = vmin + 1.0f;
+    // 12..15 V unless the data goes outside that, in 0.5 V steps
+    if (vmin > vmax) { vmin = 12.0f; vmax = 15.0f; }
+    vmin = fminf(12.0f, floorf((vmin - 0.15f) * 2.0f) / 2.0f);
+    vmax = fmaxf(15.0f, ceilf((vmax + 0.15f) * 2.0f) / 2.0f);
     lv_chart_set_range(w.chart, LV_CHART_AXIS_PRIMARY_Y, (lv_coord_t)lroundf(vmin * 100), (lv_coord_t)lroundf(vmax * 100));
 
-    // --- amps: auto range, mapped onto the 0..100 right axis ---
-    float amin = 1e9f, amax = -1e9f;
+    // --- amps: -30..+30 A (widened in 10 A steps if the data exceeds it).
+    // The right axis is amps whenever the amps series is on; SoC is then
+    // drawn scaled onto it (0 % = bottom, 100 % = top).
+    float amin = -30.0f, amax = 30.0f;
     for (int i = 0; i < history::POINTS; i++) {
         const history::Sample& s = chartPts[i];
-        if (!isnan(s.current)) { amin = fminf(amin, s.current); amax = fmaxf(amax, s.current); }
+        if (!isnan(s.current)) {
+            if (s.current < amin) amin = floorf(s.current / 10.0f) * 10.0f;
+            if (s.current > amax) amax = ceilf(s.current / 10.0f) * 10.0f;
+        }
     }
-    if (amin > amax) { amin = -1; amax = 1; }
-    amin = floorf(amin - 0.2f);
-    amax = ceilf(amax + 0.2f);
-    if (amax - amin < 2.0f) amax = amin + 2.0f;
     ampMin = amin;
     ampMax = amax;
-    secIsAmps = !(mask & 4) && (mask & 8);
+    secIsAmps = (mask & 8) != 0;
     lv_chart_set_range(w.chart, LV_CHART_AXIS_SECONDARY_Y, 0, 100);
 
     lv_coord_t* aMain = lv_chart_get_y_array(w.chart, w.serMain);
@@ -354,8 +380,8 @@ static void rebuildChart() {
     setWindowLabel();
     if (w.lblScale) {
         char buf[64];
-        if ((mask & 8) && !secIsAmps)
-            snprintf(buf, sizeof buf, "amps scaled %.0f to %.0f A (right axis = SoC)", amin, amax);
+        if (secIsAmps && (mask & 4))
+            snprintf(buf, sizeof buf, "left: volts   right: amps (SoC 0-100%% on same axis)");
         else if (secIsAmps)
             snprintf(buf, sizeof buf, "left: volts   right: amps");
         else if (mask & 4)
@@ -378,7 +404,7 @@ static void onChartDraw(lv_event_t* e) {
     } else if (d->id == LV_CHART_AXIS_SECONDARY_Y) {
         if (secIsAmps) {
             float a = ampMin + d->value / 100.0f * (ampMax - ampMin);
-            lv_snprintf(d->text, d->text_length, "%d", (int)lroundf(a));
+            lv_snprintf(d->text, d->text_length, "%d A", (int)lroundf(a));
         } else {
             lv_snprintf(d->text, d->text_length, "%d%%", d->value);
         }
@@ -390,9 +416,9 @@ lv_obj_t* mkChart(lv_obj_t* parent, int wd, int ht, const lv_font_t* tickFont, i
     lv_obj_set_size(c, wd, ht);
     lv_chart_set_type(c, LV_CHART_TYPE_LINE);
     lv_chart_set_point_count(c, history::POINTS);
-    lv_chart_set_div_line_count(c, 5, 5);
-    lv_chart_set_axis_tick(c, LV_CHART_AXIS_PRIMARY_Y, 6, 3, 5, 2, true, tickLabelSize);
-    lv_chart_set_axis_tick(c, LV_CHART_AXIS_SECONDARY_Y, 6, 3, 5, 2, true, tickLabelSize);
+    lv_chart_set_div_line_count(c, 7, 5);
+    lv_chart_set_axis_tick(c, LV_CHART_AXIS_PRIMARY_Y, 6, 3, 7, 1, true, tickLabelSize);
+    lv_chart_set_axis_tick(c, LV_CHART_AXIS_SECONDARY_Y, 6, 3, 7, 1, true, tickLabelSize);
     lv_chart_set_axis_tick(c, LV_CHART_AXIS_PRIMARY_X, 6, 3, 5, 2, false, 10);
     lv_obj_set_style_bg_color(c, col::bg(), 0);
     lv_obj_set_style_border_color(c, col::grid(), 0);
@@ -743,14 +769,15 @@ void update(const State& s) {
         }
         lv_label_set_text(w.lblPairStatus, buf);
     }
-    // Phone icon on the Halo page: nearest present phone, else first paired
+    // Phone icon on the Halo page: blue = open mode (no phones paired),
+    // green = a paired phone is here, red = none here.
     if (w.lblPhoneIcon) {
+        lv_obj_clear_flag(w.lblPhoneIcon, LV_OBJ_FLAG_HIDDEN);
         if (nPhones == 0) {
-            lv_obj_add_flag(w.lblPhoneIcon, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_text_color(w.lblPhoneIcon, col::charge(), 0);
             if (w.lblPhoneName) lv_obj_add_flag(w.lblPhoneName, LV_OBJ_FLAG_HIDDEN);
         } else {
             int near = presence::nearestPresent();
-            lv_obj_clear_flag(w.lblPhoneIcon, LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_text_color(w.lblPhoneIcon, near >= 0 ? col::good() : col::bad(), 0);
             if (w.lblPhoneName) {
                 lv_obj_clear_flag(w.lblPhoneName, LV_OBJ_FLAG_HIDDEN);
