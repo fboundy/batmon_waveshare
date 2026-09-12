@@ -9,7 +9,7 @@
 // Firmware identity
 // ---------------------------------------------------------------------------
 #define FW_NAME     "batmon-display"
-#define FW_VERSION  "0.2.1"
+#define FW_VERSION  "0.3.0"
 
 // ---------------------------------------------------------------------------
 // I2C bus (shared: TCA9554 IO expander, CST820 touch, QMI8658 IMU, PCF85063 RTC)
@@ -71,6 +71,10 @@
 // Bounce buffer (in pixels) avoids screen drift when PSRAM bandwidth is contended.
 #define LCD_BOUNCE_PX        (LCD_H_RES * 10)
 
+// Mount orientation: 1 = rotate the whole UI (and touch) by 180 degrees.
+// Done in software on the frame buffer; see docs/03-architecture.md.
+#define LCD_ROTATE_180       1
+
 // Backlight PWM
 #define BL_PWM_FREQ_HZ       20000
 #define BL_PWM_RES_BITS      10
@@ -97,6 +101,7 @@
 #define BLE_RECONNECT_BACKOFF_MS  2000
 #define BLE_PAUSE_DEFAULT_MS      (5 * 60 * 1000)  // "let the phone app in" pause
 
+#define HISTORY_SAVE_MS           (5 * 60 * 1000)   // flush history to LittleFS
 #define UI_REFRESH_MS             250
 #define CHART_REFRESH_MS          5000
 // Alert: aux battery is on charge but the main battery is not

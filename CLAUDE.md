@@ -30,7 +30,10 @@ Windows gotchas (both cost real time the first session):
 - `src/batmon/batmon_client.*` — NimBLE 2.x central task (core 0). All BLE calls happen here.
 - `src/board/*` — TCA9554, ST7701 RGB panel (init table copied from Waveshare demo), CST820, LVGL 8.3 port.
 - `src/ui/ui.cpp` — four tileview pages (Halo, Details, Chart, Setup). Only the loop task touches LVGL.
-- `src/history.*` — PSRAM ring buffers behind the chart page; fed from the BLE task.
+- `src/history.*` — PSRAM ring buffers behind the chart page; fed from the BLE task; saved to
+  LittleFS `/history.bin` every 5 min by its own task; RTC (`src/board/rtc.*`) sizes the reboot gap.
+- `LCD_ROTATE_180` in `config.h`: software flip in `LvglPort::flushCb` + mirrored touch.
+- Page order: Halo, Chart, Details, Setup.
 - `src/config.h` — every pin and tunable.
 - `include/lv_conf.h` — LVGL config (fonts 14–48 enabled, demos off).
 

@@ -74,7 +74,7 @@ static lv_obj_t* lblBt;      // Bluetooth icon, green = connected, red = not
 // Detail page
 enum DetailRow {
     D_VOLTS, D_EXT_VOLTS, D_CURRENT, D_WATTS, D_AH, D_AH_MAX, D_AH_MIN,
-    D_EXT_TEMP, D_INT_TEMP, D_RSSI, D_POLLS, D_ADDR, D_COUNT
+    D_EXT_TEMP, D_INT_TEMP, D_RSSI, D_POLLS, D_ADDR, D_HISTORY, D_COUNT
 };
 static lv_obj_t* detVal[D_COUNT];
 static lv_obj_t* swRelay;
@@ -280,7 +280,7 @@ static void onSwitchRelay(lv_event_t* e) {
 static void buildDetail(lv_obj_t* page) {
     static const char* names[D_COUNT] = {
         "Main voltage", "Aux voltage", "Current", "Power", "Amp hours", "Ah full ref",
-        "Ah min", "Ext temp", "CPU temp", "RSSI", "Polls ok/err", "Address"};
+        "Ah min", "Ext temp", "CPU temp", "RSSI", "Polls ok/err", "Address", "History saved"};
 
     lv_obj_t* title = mkLabel(page, &lv_font_montserrat_20, C_ACCENT);
     lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 46);
@@ -641,8 +641,8 @@ void create(board::Display& display) {
     lv_obj_set_scrollbar_mode(tv, LV_SCROLLBAR_MODE_OFF);
 
     lv_obj_t* pHalo   = lv_tileview_add_tile(tv, 0, 0, LV_DIR_RIGHT);
-    lv_obj_t* pDetail = lv_tileview_add_tile(tv, 1, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
-    pChart            = lv_tileview_add_tile(tv, 2, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
+    pChart            = lv_tileview_add_tile(tv, 1, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
+    lv_obj_t* pDetail = lv_tileview_add_tile(tv, 2, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
     lv_obj_t* pSetup  = lv_tileview_add_tile(tv, 3, 0, LV_DIR_LEFT);
     for (lv_obj_t* p : {pHalo, pDetail, pChart, pSetup}) {
         lv_obj_set_style_bg_color(p, C_BG, 0);
@@ -755,6 +755,13 @@ void update(const State& s) {
     snprintf(buf, sizeof buf, "%lu / %lu", (unsigned long)s.pollOk, (unsigned long)s.pollErrors);
     lv_label_set_text(detVal[D_POLLS], buf);
     lv_label_set_text(detVal[D_ADDR], s.deviceAddr[0] ? s.deviceAddr : "--");
+    if (history::lastSaveMs()) {
+        uint32_t ago = (millis() - history::lastSaveMs()) / 1000;
+        snprintf(buf, sizeof buf, "%lum %02lus ago", (unsigned long)ago / 60, (unsigned long)ago % 60);
+    } else {
+        snprintf(buf, sizeof buf, "not yet (%lu restored)", (unsigned long)history::restoredSamples());
+    }
+    lv_label_set_text(detVal[D_HISTORY], buf);
 
     // Reflect the device's real pin state without firing our own handlers.
     if ((int32_t)(millis() - switchHoldUntilMs) >= 0) {

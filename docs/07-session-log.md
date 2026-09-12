@@ -110,6 +110,20 @@ continue on another machine. Newest entries at the bottom.
   Pillow's `getbbox()` is not a tight ink box - measure the rendered glyph.
 - Flashed and booting; not yet seen against the BatMon.
 
+## 2026-09-12 - v0.3.0: rotation, page order, persistent history
+
+- **180° rotation** (`LCD_ROTATE_180`): LVGL's `sw_rotate` refuses
+  `full_refresh`, so the flush callback reverses the frame buffer in place
+  and touch coordinates are mirrored. Hardware rotation via ST7701 MADCTL
+  untested - roadmap.
+- **Page order** now Halo, Chart, Details, Setup.
+- **History persisted** to LittleFS (`/history.bin`, ~207 KB, every 5 min,
+  temp-file + rename). NVS was ruled out (20 KB partition). A `hist_save`
+  task does the flash writes so BLE polling never blocks. The PCF85063 RTC
+  (new `src/board/rtc.*`) timestamps saves; on boot the elapsed time is
+  turned into NaN gap samples. No RTC battery -> after a power loss the gap
+  is unknown and assumed zero.
+- Details page shows time since the last save.
+
 ### Not yet done
-- History is RAM-only and relative-time; TF-card persistence and RTC
-  timestamps are on the roadmap.
+- Real time on the chart axis needs a time source; see roadmap.

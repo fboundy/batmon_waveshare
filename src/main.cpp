@@ -9,6 +9,7 @@
 #include "batmon/batmon_client.h"
 #include "board/display.h"
 #include "board/lvgl_port.h"
+#include "board/rtc.h"
 #include "board/tca9554.h"
 #include "board/touch.h"
 #include "config.h"
@@ -20,6 +21,9 @@ static board::Tca9554  g_io(TCA9554_ADDR);
 static board::Display  g_display;
 static board::Touch    g_touch;
 static board::LvglPort g_lvgl;
+static board::Rtc      g_rtc;
+
+static bool rtcClock(uint32_t& secs) { return g_rtc.now(secs); }
 
 void setup() {
     Serial.begin(115200);
@@ -40,7 +44,9 @@ void setup() {
     g_touch.begin(g_io);
     g_lvgl.begin(g_display, g_touch);
 
-    history::begin();   // before the UI: the chart page reads it at build time
+    g_rtc.begin();
+    // Before the UI: the chart page reads history at build time.
+    history::begin(rtcClock, !g_rtc.lostContinuity());
 
     if (g_lvgl.lock()) {
         ui::create(g_display);

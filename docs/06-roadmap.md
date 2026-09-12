@@ -19,9 +19,12 @@
 - [ ] Auto-dim / night mode (time-of-day via RTC, or ambient via a schedule)
 - [ ] Screen-off after inactivity with tap-to-wake (touch INT on GPIO16)
 - [ ] Smoothed current / power (EMA) for a calmer runtime estimate
-- [x] History chart (V / aux V / SoC / I; hour–month) — RAM only
-- [ ] Persist history to the TF card so it survives reboots; use the RTC for
-      real timestamps on the chart axis
+- [x] History chart (V / aux V / SoC / I; hour–month)
+- [x] Persist history (LittleFS, every 5 min; RTC measures the reboot gap)
+- [ ] Real timestamps on the chart axis — needs a time source (NTP over
+      Wi-Fi, or set the RTC from the phone / a BatMon epoch) and an RTC
+      backup battery on the header so power loss doesn't reset it
+- [ ] Hardware 180° rotation via ST7701 MADCTL instead of the software flip
 - [x] Charge-mismatch alert (aux charging, main not) on the main page
 - [ ] Configurable low-SoC / low-voltage alarm using the onboard buzzer;
       optionally beep on the charge-mismatch alert too

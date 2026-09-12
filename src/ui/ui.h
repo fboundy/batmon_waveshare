@@ -2,8 +2,8 @@
 // panel:
 //   0  Halo   - SoC dial, main/aux voltage, current, power, temperature,
 //               switch control, charge-mismatch alert (the BatMon Halo look)
-//   1  Detail - every raw reading, link stats, relay / switch control
-//   2  Chart  - history of main V / aux V / SoC / current; Hour/Day/Week/Month
+//   1  Chart  - history of main V / aux V / SoC / current; Hour/Day/Week/Month
+//   2  Detail - every raw reading, link stats, relay / switch control
 //   3  Setup  - battery capacity, brightness, units, pause BLE, forget device
 #pragma once
 

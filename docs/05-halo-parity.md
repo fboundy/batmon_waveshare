@@ -35,7 +35,8 @@ Already implemented:
   a split-charge relay or DC-DC charger not engaging.
 * **History chart page** — Main V, Aux V, SoC and current over the last
   Hour / Day / Week / Month, scrollable back through 24 h of 15 s samples and
-  30 days of 6 min samples (RAM only; lost on reboot).
+  30 days of 6 min samples, saved to flash every 5 minutes so it survives
+  reboots and re-flashing.
 * **Details page** — raw Ah counter, full/min reference, external voltage,
   BatMon CPU temperature, RSSI, poll statistics, MAC address.
 * **Relay and switch control** from the display (the HA switch entities).

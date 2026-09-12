@@ -14,7 +14,7 @@ from which the display init sequence and pin map were taken.
 | Touch | CST820 capacitive, I2C `0x15`, INT on GPIO16, reset via IO expander |
 | IO expander | TCA9554PWR, I2C `0x20` — LCD reset/CS, touch reset, SD CS, buzzer, IMU/RTC interrupts. **Not** brought out |
 | IMU | QMI8658 6-axis, I2C (INT1/INT2 on expander) — unused by this firmware |
-| RTC | PCF85063, I2C, backup-battery header — unused by this firmware |
+| RTC | PCF85063, I2C `0x51`, backup-battery header (unpopulated) — used as a monotonic clock to size the reboot gap in the history |
 | Storage | TF-card slot (SPI, shares MOSI/SCK with the LCD SPI) — unused |
 | Power | USB-C 5 V; MX1.25 LiPo header with charger; ME6217C33 3.3 V LDO (800 mA); battery sense on GPIO4 (÷3) |
 | USB | Native USB (GPIO19/20) **and** a CH343P USB-UART on a second USB-C; auto-download circuit |

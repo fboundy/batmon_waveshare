@@ -14,7 +14,7 @@ It connects to a BatMon over Bluetooth LE, stays connected, and shows:
   charging but the main one is not
 * A details page with every raw reading and **relay / switch control**
 * A chart page: main V / aux V / SoC / current over the last hour, day, week
-  or month, scrollable
+  or month, scrollable; history is saved to flash every five minutes
 * A setup page for battery capacity, brightness, °C/°F, and a **Pause BLE**
   button that lets the phone app in for five minutes
 
@@ -34,7 +34,7 @@ pio run -t upload          # flash over USB-C
 pio device monitor         # 115200 baud
 ```
 
-Swipe left on the display for details, again for the chart, again for setup. Enter your battery
+Swipe left on the display for the chart, again for details, again for setup. Enter your battery
 bank capacity in Ah to enable the SoC reading. The first BatMon found is
 remembered; use *Forget device* to change it.
 

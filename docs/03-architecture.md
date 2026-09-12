@@ -5,11 +5,12 @@ src/
 ├── main.cpp                 setup(): bring up board, UI, BLE; loop(): LVGL + UI refresh
 ├── config.h                 every pin, timing and tunable in one place
 ├── settings.{h,cpp}         NVS-backed user settings (Preferences, namespace "batmon")
-├── history.{h,cpp}          two-tier PSRAM ring buffers of V / aux V / SoC / I for the chart page
+├── history.{h,cpp}          two-tier PSRAM ring buffers of V / aux V / SoC / I, persisted to LittleFS
 ├── board/                   Waveshare board support
 │   ├── tca9554.*            IO expander
 │   ├── display.*            ST7701 init over 3-wire SPI + esp_lcd RGB panel + backlight PWM
 │   ├── touch.*              CST820
+│   ├── rtc.*                PCF85063, used as a monotonic clock to measure reboot gaps
 │   └── lvgl_port.*          LVGL 8.3 display/indev glue, tick timer, LVGL mutex
 ├── batmon/
 │   ├── batmon_protocol.*    pure encode/decode of the BatMon wire format (no BLE deps)
@@ -30,6 +31,7 @@ test/test_protocol/          Unity tests for batmon_protocol (host, `pio test -e
 | `loopTask` (Arduino `loop()`) | 1 | 1 | `lv_timer_handler()`, touch polling, calls `ui::update()` every 250 ms with a fresh snapshot |
 | `batmon_ble` | 0 | 2 | everything NimBLE: scanning, connecting, sequential polling, executing queued commands |
 | NimBLE host task | 0 | — | created by NimBLE-Arduino |
+| `hist_save` | 0 | 1 | copies the history buffers under the lock, then writes `/history.bin` to LittleFS |
 | `lvgl_tick` esp_timer | — | — | `lv_tick_inc(2)` every 2 ms |
 
 Data flows one way: the BLE task writes into `Client::state_` under a mutex;
@@ -91,22 +93,40 @@ the 1 s polls:
 `history::push()` is called by the BLE task after every fast poll;
 `history::tick()` (also from the BLE task) commits an interval when it has
 elapsed, writing NaN for intervals with no data so gaps show as breaks in
-the line. Timing is `millis()`-based — windows are "relative to now" — and
-everything is lost on reboot; SD-card persistence is on the roadmap.
+the line. Timing is `millis()`-based, so windows are "relative to now".
+
+### Persistence
+
+Every `HISTORY_SAVE_MS` (5 min) `tick()` signals the `hist_save` task, which
+snapshots both buffers plus the partial tier-1 accumulator into PSRAM
+staging copies and writes them to `/history.bin` (~207 KB) on LittleFS
+(the 3.4 MB `spiffs` partition of `default_16MB.csv`; NVS is only 20 KB).
+The write goes to `/history.tmp` and is renamed, so a power cut mid-write
+leaves the previous file intact. Wear: ~60 MB/day over a 3.4 MB
+wear-levelled region is ~20 erase cycles/day, decades of endurance.
+
+At boot `history::begin()` restores the file, then uses the PCF85063 RTC to
+work out how long the display was off and pushes that many NaN samples so
+the restored data lands at the right place on the time axis. The RTC has no
+backup battery, so it only survives resets/reflashes, not power loss: if its
+oscillator-stop flag is set the gap is unknown and assumed to be zero (the
+old data is simply continued — a limitation, logged as a warning).
+`Rtc::begin()` restarts the count at 2000-01-01 in that case.
 
 `history::window(range, offset, out[240])` returns one chart's worth of
 points, averaged over the stride, with `offset` windows back from now.
 
 ## UI
 
-Four tiles in an `lv_tileview`, swiped horizontally. All widgets are kept
-inside the visible circle of the round panel (roughly a 440 px diameter).
+Four tiles in an `lv_tileview`, swiped horizontally, in the order Halo,
+Chart, Details, Setup. All widgets are kept inside the visible circle of the
+round panel (roughly a 440 px diameter).
 
 | Tile | Contents |
 |---|---|
 | Halo | 270° SoC arc coloured green/amber/red; 72 px SoC digits with a 32 px unit on a shared baseline; **Main** and **Aux** voltages (40 px, 28 px units) side by side; current with charge/discharge arrow (blue = charging, amber = discharging); power; external temperature; time-to-empty/full; large **Switch** output toggle; red **charge-mismatch alert** (aux > 13.0 V while main current < 0.2 A); Bluetooth glyph in the arc's gap, green when connected with fresh data, red otherwise |
-| Details | every raw reading, RSSI, poll counters, MAC; **Relay** and **Switch** toggles |
 | Chart | line chart of Main V / Aux V / SoC / Amps (toggle buttons), **Hour / Day / Week / Month** range buttons and ◀ ▶ to scroll one range at a time. Left axis is volts (auto-ranged); right axis is SoC % when SoC is shown, otherwise amps (auto-ranged). When both SoC and amps are on, amps are scaled onto the SoC axis and the scale is printed under the chart |
+| Details | every raw reading, RSSI, poll counters, MAC, time since the last history save; **Relay** and **Switch** toggles |
 | Setup | capacity ±1/±10 Ah, brightness slider, °C/°F, **Pause BLE 5 min / Resume**, **Forget device**, firmware version |
 
 Readings older than 10 s are drawn grey so a frozen link is obvious.
@@ -127,3 +147,13 @@ This is the same scheme Waveshare's demo uses and it is tear-free at 16 MHz.
 
 Cost: every LVGL redraw touches the whole 480 × 480 × 2 B buffer in PSRAM
 (~460 KB). At a 250 ms UI refresh this is negligible.
+
+### Orientation
+
+`LCD_ROTATE_180` (on by default — the board is mounted USB-up) turns the UI
+upside down. LVGL's own `sw_rotate` refuses to work with `full_refresh`, so
+`LvglPort::flushCb()` reverses the frame buffer in place (two RGB565 pixels
+per 32-bit word: reverse the words, swap the halves — a few ms in PSRAM)
+before handing it to the RGB driver, and `touchCb()` mirrors both touch
+axes. Doing it in the ST7701 (MADCTL / `0xC7` source-direction registers)
+would be free but is untested on this panel.
