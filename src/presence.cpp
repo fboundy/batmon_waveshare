@@ -75,7 +75,7 @@ static void eraseName(const Phone& p) {
     char key[16];
     addrKey(p.addr, key);
     if (pr.begin(NS, false)) {
-        pr.remove(key);
+        if (pr.isKey(key)) pr.remove(key);
         pr.end();
     }
 }
@@ -277,18 +277,39 @@ uint32_t pairingRemainingMs() {
     return pairingUntilMs - millis();
 }
 
+// ble_gap_unpair() refuses (BLE_HS_EBUSY) to drop a bond that carries an
+// IRK while scanning or advertising is active, and our scan runs all the
+// time.  Pause both around the delete.
+static bool deleteBondQuiet(const NimBLEAddress& a) {
+    NimBLEScan* scan = NimBLEDevice::getScan();
+    bool wasScanning = scan->isScanning();
+    bool wasAdv = NimBLEDevice::getAdvertising()->isAdvertising();
+    if (wasScanning) scan->stop();
+    if (wasAdv) NimBLEDevice::getAdvertising()->stop();
+    bool ok = NimBLEDevice::deleteBond(a);
+    if (!ok) ESP_LOGW(TAG, "deleteBond %s failed", a.toString().c_str());
+    if (wasAdv) NimBLEDevice::getAdvertising()->start(0);
+    if (wasScanning) scan->start(0, false, true);
+    return ok;
+}
+
 bool forget(int i) {
     if (i < 0 || i >= nPhones) return false;
     NimBLEAddress a(std::string(phones[i].addr), phones[i].addrType);
-    eraseName(phones[i]);
-    bool ok = NimBLEDevice::deleteBond(a);
+    bool ok = deleteBondQuiet(a);
+    if (ok) eraseName(phones[i]);
     reload();
     return ok;
 }
 
 void forgetAll() {
     for (int i = 0; i < nPhones; i++) eraseName(phones[i]);
+    NimBLEScan* scan = NimBLEDevice::getScan();
+    bool wasScanning = scan->isScanning();
+    if (wasScanning) scan->stop();
+    NimBLEDevice::getAdvertising()->stop();
     NimBLEDevice::deleteAllBonds();
+    if (wasScanning) scan->start(0, false, true);
     reload();
 }
 
