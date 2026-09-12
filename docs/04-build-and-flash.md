@@ -152,3 +152,29 @@ copy `src/` into a sketch folder, rename `main.cpp` to `<sketch>.ino`, put
 `include/lv_conf.h` next to the LVGL library, install **lvgl 8.3.x** and
 **NimBLE-Arduino 2.x**, and use board *ESP32S3 Dev Module* with
 OPI PSRAM, 16 MB flash, USB CDC on boot enabled.
+
+## Custom ESP-IDF configuration (branch `feature/idf-hybrid`)
+
+The 2.1 env sets `custom_sdkconfig` in `platformio.ini`. pioarduino then
+rebuilds the Arduino core libraries from ESP-IDF source with those options
+(first build ~10 min, needs ~2 GB for `framework-espidf`; later builds are
+normal) and the sketch compiles exactly as before. Options and why:
+
+| Option | Why |
+|---|---|
+| `CONFIG_SPIRAM_MODE_OCT` | the rebuild ignores the board's memory type; this board has octal PSRAM |
+| `CONFIG_SPIRAM_BOOT_INIT` | required with XIP: PSRAM must be up before the Arduino core's lazy init |
+| `CONFIG_SPIRAM_XIP_FROM_PSRAM` (+ `FETCH_INSTRUCTIONS`, `RODATA`) | flash writes (history save, NVS) no longer stall PSRAM, so the RGB panel keeps streaming |
+| `CONFIG_LCD_RGB_ISR_IRAM_SAFE`, `CONFIG_GDMA_ISR_IRAM_SAFE`, `CONFIG_GDMA_CTRL_FUNC_IN_IRAM` | the panel's bounce-buffer refill ISR keeps running during flash writes |
+| `CONFIG_LCD_RGB_RESTART_IN_VSYNC` | already on in the stock core; kept explicit |
+| `CONFIG_COMPILER_OPTIMIZATION_PERF` | speed over size |
+
+`custom_component_remove` drops the RainMaker/Insights/ESP-SR/Zigbee/etc.
+managed components the lib builder would otherwise pull in (one of them has
+an embedded-file path bug on Windows). `default_16MB.csv` lives in the
+project root because the lib builder wants it there.
+
+Quirks: when running via `python -m platformio` the automatic re-run after
+the core rebuild fails with `"None" is not recognized` - just run `pio run`
+again. The rebuilt libraries replace the stock ones inside
+`framework-arduinoespressif32-libs`; delete that package to go back.
