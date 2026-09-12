@@ -47,6 +47,7 @@ bool init() {
 
 LvglPort& lvgl() { return g_lvgl; }
 void setBacklight(uint8_t percent) { g_display.setBacklight(percent); }
+void displayResync() {}
 bool clock(uint32_t&) { return false; }
 bool clockValid() { return false; }
 

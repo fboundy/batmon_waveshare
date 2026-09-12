@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "esp_lcd_panel_ops.h"
+#include "esp_lcd_panel_rgb.h"
 
 namespace board {
 
@@ -28,6 +29,15 @@ public:
     // Blit / swap.  x2,y2 are inclusive.
     void flush(int x1, int y1, int x2, int y2, const void* pixels);
 
+    // Blocks until the next VSYNC (i.e. until a flush() swap has taken
+    // effect) or the timeout.  Returns false on timeout.
+    bool waitVsync(uint32_t timeoutMs);
+
+    // Restart the panel timing.  Flash writes stall PSRAM, which the panel
+    // streams from, and can leave the picture scrambled/drifted; this
+    // recovers it.  Call from a task after any flash write.
+    void resync();
+
     // 0..100
     void setBacklight(uint8_t percent);
     uint8_t backlight() const { return backlight_; }
@@ -39,7 +49,10 @@ private:
     void spiData(uint8_t data);
     void sendInitSequence();
 
+    static bool onVsync(esp_lcd_panel_handle_t, const esp_lcd_rgb_panel_event_data_t* edata, void* user);
+
     esp_lcd_panel_handle_t panel_ = nullptr;
+    void* vsyncSem_ = nullptr;   // SemaphoreHandle_t
     void* fb_[2] = {nullptr, nullptr};
     void* spi_ = nullptr;   // spi_device_handle_t
     uint8_t backlight_ = 0;

@@ -3,6 +3,8 @@
 #include <Preferences.h>
 #include <string.h>
 
+#include "board/board.h"
+
 Settings g_settings;
 
 static const char* NS = "batmon";
@@ -37,6 +39,7 @@ void Settings::save() const {
     p.putBool("relayph", relayFollowsPhone);
     p.putUShort("phto", presenceTimeoutS);
     p.end();
+    board::displayResync();   // the NVS write may have upset the RGB panel
 }
 
 void Settings::reset() {

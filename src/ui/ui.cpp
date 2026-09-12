@@ -105,13 +105,13 @@ lv_obj_t* mkButton(lv_obj_t* parent, const char* text, int wd, int ht, lv_event_
     return b;
 }
 
+// A toggle button driven by LV_EVENT_CLICKED with the CHECKED state managed
+// by the callback (via applySeriesButtons), like the range buttons.
 lv_obj_t* mkCheckButton(lv_obj_t* parent, const char* text, int wd, int ht, lv_color_t on,
                         lv_event_cb_t cb, void* ud) {
-    lv_obj_t* b = mkButton(parent, text, wd, ht, nullptr, nullptr, &lv_font_montserrat_14);
-    lv_obj_add_flag(b, LV_OBJ_FLAG_CHECKABLE);
+    lv_obj_t* b = mkButton(parent, text, wd, ht, cb, ud, &lv_font_montserrat_14);
     lv_obj_set_style_bg_color(b, on, LV_STATE_CHECKED);
     lv_obj_set_style_text_color(lv_obj_get_child(b, 0), lv_color_black(), LV_STATE_CHECKED);
-    lv_obj_add_event_cb(b, cb, LV_EVENT_VALUE_CHANGED, ud);
     return b;
 }
 
@@ -418,10 +418,9 @@ lv_obj_t* mkChart(lv_obj_t* parent, int wd, int ht, const lv_font_t* tickFont, i
 
 void onSeriesToggle(lv_event_t* e) {
     int bit = (int)(intptr_t)lv_event_get_user_data(e);
-    bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
-    if (on) g_settings.chartMask |= (1 << bit);
-    else    g_settings.chartMask &= ~(1 << bit);
+    g_settings.chartMask ^= (1 << bit);
     g_settings.save();
+    applySeriesButtons();
     rebuildChart();
 }
 

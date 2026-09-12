@@ -16,6 +16,10 @@ LvglPort& lvgl();
 
 void setBacklight(uint8_t percent);
 
+// Call after any flash write (NVS / LittleFS): RGB panels that stream from
+// PSRAM can lose sync while flash is busy.  No-op on other panels.
+void displayResync();
+
 // Monotonic seconds counter for history save/restore (RTC).  Returns false
 // on boards without one.  clockValid() is false if the clock restarted
 // since the last save (power loss) or the board has no clock at all.
@@ -32,5 +36,9 @@ ButtonEvent pollButton();
 // millis() of the last touch or button press (for waking from standby).
 uint32_t lastInputMs();
 void noteInput();
+
+// Raw touch diagnostics: when enabled, every pressed sample is logged.
+void setTouchLog(bool on);
+bool touchLog();
 
 }  // namespace board

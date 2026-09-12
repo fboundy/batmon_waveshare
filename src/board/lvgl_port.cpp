@@ -34,6 +34,7 @@ void LvglPort::flushCb(lv_disp_drv_t* drv, const lv_area_t* area, lv_color_t* px
         // in-place rotation of the buffer we were just handed is safe.
         if (c.rotate180) rotate180(reinterpret_cast<uint16_t*>(px), (size_t)c.width * c.height);
         c.flush(0, 0, c.width - 1, c.height - 1, px);
+        if (c.waitVsync) c.waitVsync();
     } else {
         c.flush(area->x1, area->y1, area->x2, area->y2, px);
     }
@@ -49,10 +50,12 @@ void LvglPort::touchCb(lv_indev_drv_t* drv, lv_indev_data_t* data) {
     uint16_t x, y;
     if (self->cfg_.touchRead && self->cfg_.touchRead(x, y)) {
         noteInput();
+        uint16_t rx = x, ry = y;
         if (self->cfg_.rotate180) {
             x = self->cfg_.width - 1 - x;
             y = self->cfg_.height - 1 - y;
         }
+        if (touchLog()) Serial.printf("touch raw %u,%u -> ui %u,%u\n", rx, ry, x, y);
         data->point.x = x;
         data->point.y = y;
         data->state = LV_INDEV_STATE_PRESSED;

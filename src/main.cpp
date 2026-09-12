@@ -46,6 +46,14 @@ void loop() {
     lvgl.loop();
 
     presence::tick();
+
+    // A history save just finished: flash writes stall PSRAM and can leave
+    // the RGB panel scrambled, so restart its timing.
+    static uint32_t lastSeenSave = 0;
+    if (history::lastSaveMs() != lastSeenSave) {
+        lastSeenSave = history::lastSaveMs();
+        board::displayResync();
+    }
     // Standby: paired phones exist but none is here.  Screen off unless
     // someone touched it / pressed the button recently.
     bool wantOn = presence::gateOpen() || (millis() - board::lastInputMs() < WAKE_MS);

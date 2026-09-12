@@ -33,6 +33,7 @@ static void help() {
         "  forget                 forget the preferred BatMon and rescan\n"
         "  save                   flush history to flash now\n"
         "  page                   next page\n"
+        "  touchlog <0|1>         print raw touch coordinates (diagnostics)\n"
         "  phone list             paired phones and presence\n"
         "  phone pair             open a 2 min pairing window (advertises 'BatMon Display')\n"
         "  phone forget <n|all>\n"
@@ -194,6 +195,9 @@ static void execute(char* l) {
         g_settings.save();
         uiChanged();
         Serial.printf("relay follows phone: %d\n", on);
+    } else if (!strcasecmp(cmd, "touchlog") && onOff(a1, on)) {
+        board::setTouchLog(on);
+        Serial.printf("touch logging %s\n", on ? "on" : "off");
     } else if (!strcasecmp(cmd, "page")) {
         if (board::lvgl().lock(200)) {
             ui::nextPage();

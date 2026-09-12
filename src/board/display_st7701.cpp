@@ -6,6 +6,8 @@
 #include "driver/spi_master.h"
 #include "esp_lcd_panel_rgb.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 #include "../config.h"
 #include "tca9554.h"
@@ -190,12 +192,35 @@ bool Display::begin(Tca9554& io) {
     esp_lcd_panel_reset(panel_);
     esp_lcd_panel_init(panel_);
     esp_lcd_rgb_panel_get_frame_buffer(panel_, 2, &fb_[0], &fb_[1]);
+
+    vsyncSem_ = xSemaphoreCreateBinary();
+    esp_lcd_rgb_panel_event_callbacks_t cbs = {};
+    cbs.on_vsync = onVsync;
+    esp_lcd_rgb_panel_register_event_callbacks(panel_, &cbs, this);
     ESP_LOGI(TAG, "RGB panel up, fb0=%p fb1=%p", fb_[0], fb_[1]);
 
     // --- backlight PWM ---
     ledcAttach(PIN_LCD_BL, BL_PWM_FREQ_HZ, BL_PWM_RES_BITS);
     setBacklight(BL_DEFAULT_PERCENT);
     return true;
+}
+
+bool Display::onVsync(esp_lcd_panel_handle_t, const esp_lcd_rgb_panel_event_data_t*, void* user) {
+    Display* self = static_cast<Display*>(user);
+    BaseType_t woken = pdFALSE;
+    if (self->vsyncSem_) xSemaphoreGiveFromISR((SemaphoreHandle_t)self->vsyncSem_, &woken);
+    return woken == pdTRUE;
+}
+
+bool Display::waitVsync(uint32_t timeoutMs) {
+    if (!vsyncSem_) return false;
+    // Drain a stale give so we wait for the *next* VSYNC.
+    xSemaphoreTake((SemaphoreHandle_t)vsyncSem_, 0);
+    return xSemaphoreTake((SemaphoreHandle_t)vsyncSem_, pdMS_TO_TICKS(timeoutMs)) == pdTRUE;
+}
+
+void Display::resync() {
+    if (panel_) esp_lcd_rgb_panel_restart(panel_);
 }
 
 void Display::flush(int x1, int y1, int x2, int y2, const void* pixels) {

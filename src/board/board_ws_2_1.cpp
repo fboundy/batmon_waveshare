@@ -25,6 +25,10 @@ static void flushFrame(int x1, int y1, int x2, int y2, const void* px) {
     g_display.flush(x1, y1, x2, y2, px);
 }
 
+static void waitVsync() {
+    g_display.waitVsync(40);
+}
+
 static bool touchRead(uint16_t& x, uint16_t& y) {
     TouchPoint tp = g_touch.read();
     if (!tp.pressed) return false;
@@ -56,6 +60,7 @@ bool init() {
     cfg.bufPixels = (size_t)LCD_H_RES * LCD_V_RES;
     cfg.rotate180 = LCD_ROTATE_180;
     cfg.flush = flushFrame;
+    cfg.waitVsync = waitVsync;
     cfg.touchRead = touchRead;
     g_lvgl.begin(cfg);
     return ok;
@@ -63,6 +68,7 @@ bool init() {
 
 LvglPort& lvgl() { return g_lvgl; }
 void setBacklight(uint8_t percent) { g_display.setBacklight(percent); }
+void displayResync() { g_display.resync(); }
 bool clock(uint32_t& secs) { return g_rtc.now(secs); }
 bool clockValid() { return !g_rtc.lostContinuity(); }
 void setStatusLed(uint8_t, uint8_t, uint8_t) {}

@@ -124,25 +124,25 @@ void chart(lv_obj_t* page) {
     // Series toggles
     static const char* names[4] = {"Main V", "Aux V", "SoC", "Amps"};
     const lv_color_t cols[4] = {col::serMain(), col::serAux(), col::serSoc(), col::serAmps()};
-    const int bw = 74, bh = 30, gap = 6;
+    const int bw = 76, bh = 40, gap = 6;
     int bx = (LCD_H_RES - (4 * bw + 3 * gap)) / 2;
     for (int i = 0; i < 4; i++) {
         w.btnSeries[i] = mkCheckButton(page, names[i], bw, bh, cols[i], onSeriesToggle, (void*)(intptr_t)i);
-        lv_obj_set_pos(w.btnSeries[i], bx + i * (bw + gap), 64);
+        lv_obj_set_pos(w.btnSeries[i], bx + i * (bw + gap), 66);
     }
 
-    lv_obj_t* c = mkChart(page, 316, 186, &lv_font_montserrat_12, 44);
-    lv_obj_set_pos(c, (LCD_H_RES - 316) / 2, 114);
+    lv_obj_t* c = mkChart(page, 316, 176, &lv_font_montserrat_12, 44);
+    lv_obj_set_pos(c, (LCD_H_RES - 316) / 2, 122);
 
     w.lblWindow = mkLabel(page, &lv_font_montserrat_14, col::text());
-    lv_obj_align(w.lblWindow, LV_ALIGN_TOP_MID, 0, 310);
+    lv_obj_align(w.lblWindow, LV_ALIGN_TOP_MID, 0, 308);
 
-    // Range + scroll row
+    // Range + scroll row (thumb-sized)
     static const char* rn[4] = {"Hour", "Day", "Week", "Month"};
-    const int aw = 40, rw = 62, rh = 32, rg = 6;
+    const int aw = 56, rw = 60, rh = 42, rg = 6;
     int total = 2 * aw + 4 * rw + 5 * rg;
-    int x = (LCD_H_RES - total) / 2, y = 336;
-    lv_obj_t* bl = mkButton(page, LV_SYMBOL_LEFT, aw, rh, onScroll, (void*)(intptr_t)1);
+    int x = (LCD_H_RES - total) / 2, y = 332;
+    lv_obj_t* bl = mkButton(page, LV_SYMBOL_LEFT, aw, rh, onScroll, (void*)(intptr_t)1, &lv_font_montserrat_20);
     lv_obj_set_pos(bl, x, y);
     x += aw + rg;
     for (int i = 0; i < 4; i++) {
@@ -153,11 +153,11 @@ void chart(lv_obj_t* page) {
         lv_obj_set_pos(w.btnRange[i], x, y);
         x += rw + rg;
     }
-    lv_obj_t* br = mkButton(page, LV_SYMBOL_RIGHT, aw, rh, onScroll, (void*)(intptr_t)-1);
+    lv_obj_t* br = mkButton(page, LV_SYMBOL_RIGHT, aw, rh, onScroll, (void*)(intptr_t)-1, &lv_font_montserrat_20);
     lv_obj_set_pos(br, x, y);
 
     w.lblScale = mkLabel(page, &lv_font_montserrat_12, col::dim());
-    lv_obj_align(w.lblScale, LV_ALIGN_TOP_MID, 0, 378);
+    lv_obj_align(w.lblScale, LV_ALIGN_TOP_MID, 0, 380);
     lv_label_set_text(w.lblScale, "");
 }
 
@@ -206,10 +206,12 @@ void phones(lv_obj_t* page) {
     lv_label_set_text(title, "Phones");
 
     // Selectable list: tap a phone to select it, then Rename / Delete
+    // Scrollable (drag) list, 3 rows visible
     lv_obj_t* list = lv_obj_create(page);
     lv_obj_remove_style_all(list);
-    lv_obj_set_size(list, 300, 122);
-    lv_obj_align(list, LV_ALIGN_TOP_MID, 0, 78);
+    lv_obj_set_size(list, 300, 112);
+    lv_obj_align(list, LV_ALIGN_TOP_MID, 0, 76);
+    lv_obj_set_scroll_dir(list, LV_DIR_VER);
     lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(list, 4, 0);
     lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_AUTO);
@@ -220,23 +222,32 @@ void phones(lv_obj_t* page) {
         w.phoneRows[i] = b;
     }
 
-    lv_obj_t* bp = mkButton(page, "Pair new phone", 300, 38, onPairPhone, nullptr);
-    lv_obj_align(bp, LV_ALIGN_TOP_MID, 0, 206);
+    lv_obj_t* bp = mkButton(page, "Pair new phone", 300, 36, onPairPhone, nullptr);
+    lv_obj_align(bp, LV_ALIGN_TOP_MID, 0, 194);
     w.btnPairLbl = lv_obj_get_child(bp, 0);
 
-    w.btnRename = mkButton(page, "Rename", 145, 38, onRenamePhone, nullptr);
-    lv_obj_align(w.btnRename, LV_ALIGN_TOP_MID, -78, 250);
-    w.btnDelete = mkButton(page, "Delete", 145, 38, onDeletePhone, nullptr);
+    w.btnRename = mkButton(page, "Rename", 145, 36, onRenamePhone, nullptr);
+    lv_obj_align(w.btnRename, LV_ALIGN_TOP_MID, -78, 236);
+    w.btnDelete = mkButton(page, "Delete", 145, 36, onDeletePhone, nullptr);
     lv_obj_set_style_bg_color(w.btnDelete, col::bad(), LV_STATE_PRESSED);
-    lv_obj_align(w.btnDelete, LV_ALIGN_TOP_MID, 78, 250);
+    lv_obj_align(w.btnDelete, LV_ALIGN_TOP_MID, 78, 236);
 
     // Presence timeout: "Away after 90 s" with -/+ 15 s
-    lv_obj_t* bm = mkButton(page, LV_SYMBOL_MINUS, 44, 34, onTimeout, (void*)(intptr_t)-15);
-    lv_obj_align(bm, LV_ALIGN_TOP_MID, -110, 296);
+    lv_obj_t* bm = mkButton(page, LV_SYMBOL_MINUS, 48, 34, onTimeout, (void*)(intptr_t)-15);
+    lv_obj_align(bm, LV_ALIGN_TOP_MID, -110, 278);
     w.lblTimeout = mkLabel(page, &lv_font_montserrat_16, col::text());
-    lv_obj_align(w.lblTimeout, LV_ALIGN_TOP_MID, 0, 304);
-    lv_obj_t* bpl = mkButton(page, LV_SYMBOL_PLUS, 44, 34, onTimeout, (void*)(intptr_t)15);
-    lv_obj_align(bpl, LV_ALIGN_TOP_MID, 110, 296);
+    lv_obj_align(w.lblTimeout, LV_ALIGN_TOP_MID, 0, 286);
+    lv_obj_t* bpl = mkButton(page, LV_SYMBOL_PLUS, 48, 34, onTimeout, (void*)(intptr_t)15);
+    lv_obj_align(bpl, LV_ALIGN_TOP_MID, 110, 278);
+
+    // Relay follows phone
+    lv_obj_t* rl = mkLabel(page, &lv_font_montserrat_16, col::dim());
+    lv_label_set_text(rl, "Relay follows phone");
+    lv_obj_align(rl, LV_ALIGN_TOP_MID, -46, 326);
+    w.swRelayPhone = lv_switch_create(page);
+    lv_obj_align(w.swRelayPhone, LV_ALIGN_TOP_MID, 92, 320);
+    if (g_settings.relayFollowsPhone) lv_obj_add_state(w.swRelayPhone, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(w.swRelayPhone, onRelayPhone, LV_EVENT_VALUE_CHANGED, nullptr);
     for (lv_obj_t* b : {w.btnRename, w.btnDelete}) {
         lv_obj_set_style_bg_color(b, col::track(), LV_STATE_DISABLED);
         lv_obj_set_style_text_color(lv_obj_get_child(b, 0), col::stale(), LV_STATE_DISABLED);
@@ -247,7 +258,7 @@ void phones(lv_obj_t* page) {
     lv_obj_set_width(w.lblPairStatus, 300);
     lv_obj_set_style_text_align(w.lblPairStatus, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(w.lblPairStatus, LV_LABEL_LONG_WRAP);
-    lv_obj_align(w.lblPairStatus, LV_ALIGN_TOP_MID, 0, 342);
+    lv_obj_align(w.lblPairStatus, LV_ALIGN_TOP_MID, 0, 360);
 
     // Name dialog: full-screen overlay on the screen (above the tileview)
     w.nameDlg = lv_obj_create(lv_scr_act());
@@ -316,22 +327,14 @@ void setup(lv_obj_t* page) {
     lv_obj_add_event_cb(w.sliderBright, onBrightness, LV_EVENT_VALUE_CHANGED, nullptr);
     lv_obj_add_event_cb(w.sliderBright, onBrightness, LV_EVENT_RELEASED, nullptr);
 
-    // Units and relay-follows-phone, side by side
+    // Units
     lv_obj_t* ul = mkLabel(page, &lv_font_montserrat_16, col::dim());
     lv_label_set_text(ul, "Fahrenheit");
-    lv_obj_align(ul, LV_ALIGN_TOP_MID, -140, 276);
+    lv_obj_align(ul, LV_ALIGN_TOP_MID, -50, 276);
     w.swFahrenheit = lv_switch_create(page);
-    lv_obj_align(w.swFahrenheit, LV_ALIGN_TOP_MID, -60, 270);
+    lv_obj_align(w.swFahrenheit, LV_ALIGN_TOP_MID, 50, 270);
     if (g_settings.fahrenheit) lv_obj_add_state(w.swFahrenheit, LV_STATE_CHECKED);
     lv_obj_add_event_cb(w.swFahrenheit, onFahrenheit, LV_EVENT_VALUE_CHANGED, nullptr);
-
-    lv_obj_t* rl = mkLabel(page, &lv_font_montserrat_16, col::dim());
-    lv_label_set_text(rl, "Relay w/ phone");
-    lv_obj_align(rl, LV_ALIGN_TOP_MID, 60, 276);
-    w.swRelayPhone = lv_switch_create(page);
-    lv_obj_align(w.swRelayPhone, LV_ALIGN_TOP_MID, 160, 270);
-    if (g_settings.relayFollowsPhone) lv_obj_add_state(w.swRelayPhone, LV_STATE_CHECKED);
-    lv_obj_add_event_cb(w.swRelayPhone, onRelayPhone, LV_EVENT_VALUE_CHANGED, nullptr);
 
     // BLE controls
     lv_obj_t* bp = mkButton(page, "Pause BLE 5 min", 200, 40, onPause, nullptr);
