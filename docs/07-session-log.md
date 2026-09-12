@@ -179,3 +179,20 @@ continue on another machine. Newest entries at the bottom.
 
 ### Not yet done
 - Real time on the chart axis needs a time source; see roadmap.
+
+## 2026-09-12/13 - phone presence verified, core rebuilt with IDF options (v0.5.0)
+
+- Phone presence (branch merged): iPhone pairs via LightBlue, is resolved
+  from its rotating adverts (irk=1), standby/wake, delete/rename, naming
+  keyboard, relay-follow, relay lock, mobile-phone icon all verified.
+- Bond deletion needed the scan paused (NimBLE returns EBUSY otherwise).
+- Screen "vertical hold" rolling on the RGB panel: cured by rebuilding the
+  Arduino core against ESP-IDF via pioarduino `custom_sdkconfig`
+  (XIP from PSRAM, IRAM-safe LCD/GDMA ISRs, octal PSRAM, boot-time PSRAM
+  init, perf). Details and the linker-script gotcha in docs/04. The ST7701
+  hardware flip (SDIR/ML) shifts the picture and garbles line starts, so the
+  180-degree turn stays in software; orientation is automatic from the
+  QMI8658 accelerometer.
+- Bench lesson: opening the native-USB serial port resets the board (and
+  restarts the 60 s boot grace); scripts now open with DTR/RTS deasserted.
+- Chart: volts 12-15 V, amps -30..+30 A axes.

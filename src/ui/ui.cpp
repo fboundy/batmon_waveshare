@@ -138,7 +138,7 @@ void onSwitchSwitch(lv_event_t* e) {
 
 void onSwitchRelay(lv_event_t* e) {
     if (suppressSwitchEvents) return;
-    if (presence::anyPaired() && !presence::anyPresent()) return;   // locked in standby
+    if (g_settings.relayFollowsPhone && presence::anyPaired() && !presence::anyPresent()) return;   // locked
     bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
     switchHoldUntilMs = millis() + SWITCH_HOLD_MS;
     batmon::g_client.requestSetIo(batmon::IoType::Relay, on);
@@ -716,10 +716,10 @@ void update(const State& s) {
         setText(w.lblIoState, buf);
     }
 
-    // Relay control is locked while phones are paired but none is present
-    // (screen woken by touch/BOOT in standby): nobody without a paired phone
-    // gets to switch the relay.
-    bool relayLocked = presence::anyPaired() && !presence::anyPresent();
+    // With "relay follows phone" on, relay control is locked while phones are
+    // paired but none is present (screen woken by touch/BOOT in standby):
+    // nobody without a paired phone gets to switch the relay.
+    bool relayLocked = g_settings.relayFollowsPhone && presence::anyPaired() && !presence::anyPresent();
     for (lv_obj_t* o : {w.swRelay, w.swHaloRelay}) {
         if (!o) continue;
         if (relayLocked != lv_obj_has_state(o, LV_STATE_DISABLED)) {

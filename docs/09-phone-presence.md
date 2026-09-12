@@ -38,9 +38,10 @@ nearby. Optionally the BatMon relay follows the phone too.
    packet must not wake the display. (A proper Bluetooth-off is Settings ->
    Bluetooth, or Airplane mode.) The "away after" timeout is set on the
    Phones page / `phone timeout <s>`.
-5. **Relay lock.** While phones are paired and none is present (screen
-   woken by touch/BOOT in standby) the relay toggles are greyed out and
-   ignored, so nobody without a paired phone can switch the relay.
+5. **Relay lock** (only when *relay follows phone* is on). While phones are
+   paired and none is present (screen woken by touch/BOOT in standby) the
+   relay toggles are greyed out and ignored, so nobody without a paired
+   phone can switch the relay.
 6. **Relay follows phone** (Phones page switch / `relayphone 1`). On the first
    phone arriving the relay-on command is queued and sent as soon as the
    BatMon is connected; on the last phone leaving, relay-off is sent
