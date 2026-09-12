@@ -44,6 +44,7 @@ void setup() {
 void loop() {
     static uint32_t lastUi = 0;
     static bool screenOn = true;
+    uint32_t now = millis();
     board::LvglPort& lvgl = board::lvgl();
     lvgl.loop();
 
@@ -71,11 +72,16 @@ void loop() {
         }
     }
 
-    // A history save just finished: flash writes stall PSRAM and can leave
-    // the RGB panel scrambled, so restart its timing.
+    // RGB panels stream from PSRAM; whenever the DMA falls behind (PSRAM busy
+    // with drawing, or blocked by a flash write) the picture rolls until the
+    // DMA is re-aligned to a frame start.  Re-align periodically - it happens
+    // inside the next VSYNC and is invisible when nothing was wrong - and
+    // immediately after a history save.
+    static uint32_t lastResyncMs = 0;
     static uint32_t lastSeenSave = 0;
-    if (history::lastSaveMs() != lastSeenSave) {
+    if (history::lastSaveMs() != lastSeenSave || now - lastResyncMs >= DISPLAY_RESYNC_MS) {
         lastSeenSave = history::lastSaveMs();
+        lastResyncMs = now;
         board::displayResync();
     }
     // Standby: paired phones exist but none is here.  Screen off unless
@@ -98,7 +104,6 @@ void loop() {
     }
     console::poll();
 
-    uint32_t now = millis();
     if (now - lastUi >= UI_REFRESH_MS) {
         lastUi = now;
         batmon::State s = batmon::g_client.snapshot();

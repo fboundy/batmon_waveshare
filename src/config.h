@@ -39,6 +39,7 @@
 
 #define HISTORY_SAVE_MS           (5 * 60 * 1000)   // flush history to LittleFS
 #define UI_REFRESH_MS             250
+#define DISPLAY_RESYNC_MS         1000   // RGB panel DMA re-alignment period (drift cure)
 #define CHART_REFRESH_MS          5000
 // Charge-status icon (see docs/03-architecture.md, "Charge icon")
 #define CHG_AUX_CHARGING_V        13.2f   // aux above this = a charger is running
