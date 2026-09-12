@@ -44,11 +44,18 @@ static history::Sample chartPts[history::POINTS];   // static: too big for the l
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+// Gauge colour: red at <= 10 %, yellow at 50 %, green at >= 90 %, with a
+// linear fade between those stops.
 static lv_color_t socColor(float soc) {
-    if (soc < 0)  return col::dim();
-    if (soc < 20) return col::bad();
-    if (soc < 50) return col::warn();
-    return col::good();
+    if (soc < 0)   return col::dim();
+    if (soc >= 90) return col::good();
+    if (soc <= 10) return col::bad();
+    if (soc >= 50) {
+        uint8_t t = (uint8_t)((soc - 50.0f) / 40.0f * 255.0f);   // 0 = yellow, 255 = green
+        return lv_color_mix(col::good(), col::warn(), t);
+    }
+    uint8_t t = (uint8_t)((soc - 10.0f) / 40.0f * 255.0f);       // 0 = red, 255 = yellow
+    return lv_color_mix(col::warn(), col::bad(), t);
 }
 
 static float toDisplayTemp(float c) {
@@ -507,10 +514,10 @@ void update(const State& s) {
 
     bool relayOn = s.relay.valid() && s.relay.value > 0.5f;
     bool swOn = s.sw.valid() && s.sw.value > 0.5f;
-    if (w.lblSwitchState) {
-        snprintf(buf, sizeof buf, "Switch %s", s.sw.valid() ? (swOn ? "ON" : "OFF") : "--");
-        lv_label_set_text(w.lblSwitchState, buf);
-        lv_obj_set_style_text_color(w.lblSwitchState, swOn ? col::accent() : col::dim(), 0);
+    if (w.lblRelayState) {
+        snprintf(buf, sizeof buf, "Relay %s", s.relay.valid() ? (relayOn ? "ON" : "OFF") : "--");
+        lv_label_set_text(w.lblRelayState, buf);
+        lv_obj_set_style_text_color(w.lblRelayState, relayOn ? col::accent() : col::dim(), 0);
     }
 
     // ---- Detail page ----
@@ -556,12 +563,12 @@ void update(const State& s) {
     // Reflect the device's real pin state without firing our own handlers.
     if ((int32_t)(millis() - switchHoldUntilMs) >= 0) {
         suppressSwitchEvents = true;
-        for (lv_obj_t* o : {w.swSwitch, w.swHaloSwitch}) {
-            if (!o) continue;
-            if (swOn) lv_obj_add_state(o, LV_STATE_CHECKED); else lv_obj_clear_state(o, LV_STATE_CHECKED);
+        if (w.swSwitch) {
+            if (swOn) lv_obj_add_state(w.swSwitch, LV_STATE_CHECKED); else lv_obj_clear_state(w.swSwitch, LV_STATE_CHECKED);
         }
-        if (w.swRelay) {
-            if (relayOn) lv_obj_add_state(w.swRelay, LV_STATE_CHECKED); else lv_obj_clear_state(w.swRelay, LV_STATE_CHECKED);
+        for (lv_obj_t* o : {w.swRelay, w.swHaloRelay}) {
+            if (!o) continue;
+            if (relayOn) lv_obj_add_state(o, LV_STATE_CHECKED); else lv_obj_clear_state(o, LV_STATE_CHECKED);
         }
         suppressSwitchEvents = false;
     }

@@ -49,8 +49,8 @@ struct Widgets {
     lv_obj_t* lblWatts = nullptr;
     lv_obj_t* lblTemp = nullptr;
     lv_obj_t* lblRuntime = nullptr;
-    lv_obj_t* swHaloSwitch = nullptr;    // touch boards
-    lv_obj_t* lblSwitchState = nullptr;  // touch-less boards: "Switch ON"
+    lv_obj_t* swHaloRelay = nullptr;     // touch boards
+    lv_obj_t* lblRelayState = nullptr;   // touch-less boards: "Relay ON"
     lv_obj_t* lblAlert = nullptr;
     lv_obj_t* lblBt = nullptr;
     // Details

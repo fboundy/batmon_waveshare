@@ -78,9 +78,9 @@ void halo(lv_obj_t* page) {
     lv_obj_set_pos(w.lblRuntime, 8, 126);
     lv_label_set_text(w.lblRuntime, "");
 
-    w.lblSwitchState = mkLabel(page, &lv_font_montserrat_14, col::dim());
-    lv_obj_align(w.lblSwitchState, LV_ALIGN_TOP_RIGHT, -8, 126);
-    lv_label_set_text(w.lblSwitchState, "Switch --");
+    w.lblRelayState = mkLabel(page, &lv_font_montserrat_14, col::dim());
+    lv_obj_align(w.lblRelayState, LV_ALIGN_TOP_RIGHT, -8, 126);
+    lv_label_set_text(w.lblRelayState, "Relay --");
 
     w.lblAlert = mkLabel(page, &lv_font_montserrat_14, col::bad());
     lv_obj_align(w.lblAlert, LV_ALIGN_BOTTOM_MID, 0, -4);

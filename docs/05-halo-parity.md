@@ -29,7 +29,7 @@ Already implemented:
 
 * **Second battery voltage** (BatMon's external voltage input) on the main
   page, labelled Main / Aux.
-* **Switch output toggle** on the main page; relay on the Details page.
+* **Relay output toggle** on the main page; both relay and switch on the Details page.
 * **Charge-mismatch alert** on the main page when the aux battery is being
   charged (> 13.0 V) but the main battery is not (current < 0.2 A) — e.g.
   a split-charge relay or DC-DC charger not engaging.

@@ -150,5 +150,11 @@ continue on another machine. Newest entries at the bottom.
   before the upload; do `pio run -t upload` when it is back. 1.9 first-run
   checklist is in docs/08.
 
+### Follow-up (same day)
+- Main-page toggle is now the **Relay** (switch remains on Details).
+- Gauge colour is a continuous fade: green >= 90 %, yellow at 50 %, red
+  <= 10 % (`socColor()` in `ui.cpp`, `lv_color_mix`).
+- Both envs build; 2.1 still off USB, flash pending.
+
 ### Not yet done
 - Real time on the chart axis needs a time source; see roadmap.

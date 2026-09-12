@@ -82,16 +82,16 @@ void halo(lv_obj_t* page) {
     lv_obj_align(w.lblRuntime, LV_ALIGN_CENTER, 0, 78);
     lv_label_set_text(w.lblRuntime, "");
 
-    // Switch output control - big enough to hit with a thumb
+    // Relay output control - big enough to hit with a thumb
     lv_obj_t* rowSw = mkRow(page, 14);
     lv_obj_set_flex_align(rowSw, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_align(rowSw, LV_ALIGN_CENTER, 0, 124);
     lv_obj_t* capSw = mkLabel(rowSw, &lv_font_montserrat_20, col::dim());
-    lv_label_set_text(capSw, "Switch");
-    w.swHaloSwitch = lv_switch_create(rowSw);
-    lv_obj_set_size(w.swHaloSwitch, 100, 48);
-    lv_obj_set_style_bg_color(w.swHaloSwitch, col::accent(), LV_PART_INDICATOR | LV_STATE_CHECKED);
-    lv_obj_add_event_cb(w.swHaloSwitch, onSwitchSwitch, LV_EVENT_VALUE_CHANGED, nullptr);
+    lv_label_set_text(capSw, "Relay");
+    w.swHaloRelay = lv_switch_create(rowSw);
+    lv_obj_set_size(w.swHaloRelay, 100, 48);
+    lv_obj_set_style_bg_color(w.swHaloRelay, col::accent(), LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_add_event_cb(w.swHaloRelay, onSwitchRelay, LV_EVENT_VALUE_CHANGED, nullptr);
 
     // Alert line (hidden unless active)
     w.lblAlert = mkLabel(page, &lv_font_montserrat_18, col::bad());

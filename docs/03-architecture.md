@@ -158,8 +158,8 @@ round panel (roughly a 440 px diameter).
 
 | Tile | Contents |
 |---|---|
-| Halo (round) | 270° SoC arc coloured green/amber/red; 72 px SoC digits with a 32 px unit on a shared baseline; **Main** and **Aux** voltages (40 px, 28 px units) side by side; current with charge/discharge arrow (blue = charging, amber = discharging); power; external temperature; time-to-empty/full; large **Switch** output toggle; red **charge-mismatch alert** (aux > 13.0 V while main current < 0.2 A); Bluetooth glyph in the arc's gap, green when connected with fresh data, red otherwise |
-| Halo (wide) | horizontal SoC **bar** coloured the same way, 28 px SoC %, Main/Aux voltages, current/power/temperature, runtime, "Switch ON/OFF" text, alert line, Bluetooth glyph |
+| Halo (round) | 270° SoC arc coloured by SoC (green at >= 90 %, fading to yellow at 50 % and red at <= 10 %); 72 px SoC digits with a 32 px unit on a shared baseline; **Main** and **Aux** voltages (40 px, 28 px units) side by side; current with charge/discharge arrow (blue = charging, amber = discharging); power; external temperature; time-to-empty/full; large **Relay** output toggle (the switch stays on Details); red **charge-mismatch alert** (aux > 13.0 V while main current < 0.2 A); Bluetooth glyph in the arc's gap, green when connected with fresh data, red otherwise |
+| Halo (wide) | horizontal SoC **bar** coloured the same way, 28 px SoC %, Main/Aux voltages, current/power/temperature, runtime, "Relay ON/OFF" text, alert line, Bluetooth glyph |
 | Chart | line chart of Main V / Aux V / SoC / Amps (toggle buttons), **Hour / Day / Week / Month** range buttons and ◀ ▶ to scroll one range at a time. Left axis is volts (auto-ranged); right axis is SoC % when SoC is shown, otherwise amps (auto-ranged). When both SoC and amps are on, amps are scaled onto the SoC axis and the scale is printed under the chart |
 | Details | every raw reading, RSSI, poll counters, MAC, time since the last history save; **Relay** and **Switch** toggles |
 | Setup | capacity ±1/±10 Ah, brightness slider, °C/°F, **Pause BLE 5 min / Resume**, **Forget device**, firmware version |
