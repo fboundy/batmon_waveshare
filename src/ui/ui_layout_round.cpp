@@ -95,6 +95,9 @@ void halo(lv_obj_t* page) {
     w.swHaloRelay = lv_switch_create(rowSw);
     lv_obj_set_size(w.swHaloRelay, 100, 48);
     lv_obj_set_style_bg_color(w.swHaloRelay, col::accent(), LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_set_style_bg_color(w.swHaloRelay, col::track(), LV_PART_MAIN | LV_STATE_DISABLED);
+    lv_obj_set_style_bg_color(w.swHaloRelay, col::track(), LV_PART_INDICATOR | LV_STATE_DISABLED);
+    lv_obj_set_style_bg_color(w.swHaloRelay, col::stale(), LV_PART_KNOB | LV_STATE_DISABLED);
     lv_obj_add_event_cb(w.swHaloRelay, onSwitchRelay, LV_EVENT_VALUE_CHANGED, nullptr);
 
     // Status icons in the arc's bottom gap: Bluetooth link, phone presence,

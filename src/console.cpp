@@ -12,6 +12,8 @@
 #include "settings.h"
 #include "ui/ui.h"
 
+extern bool g_screenOn;   // main.cpp
+
 namespace console {
 
 static char line[96];
@@ -61,8 +63,11 @@ static void status() {
     Serial.printf("history: last save %lu s ago, %lu restored at boot\n",
                   history::lastSaveMs() ? (unsigned long)((millis() - history::lastSaveMs()) / 1000) : 0UL,
                   (unsigned long)history::restoredSamples());
-    Serial.printf("phones: %d paired, gate %s, relay follows phone %d\n", presence::count(),
-                  presence::gateOpen() ? "open" : "closed (standby)", g_settings.relayFollowsPhone);
+    Serial.printf("phones: %d paired, gate %s, relay follows phone %d, timeout %u s\n", presence::count(),
+                  presence::gateOpen() ? "open" : "closed (standby)", g_settings.relayFollowsPhone,
+                  g_settings.presenceTimeoutS);
+    Serial.printf("screen: %s, last input %lu s ago, up %lu s\n", g_screenOn ? "on" : "off",
+                  (unsigned long)((millis() - board::lastInputMs()) / 1000), (unsigned long)(millis() / 1000));
     float ax, ay, az;
     if (board::readAccel(ax, ay, az))
         Serial.printf("accel: x %.2f y %.2f z %.2f g   flipped %d   orientation %s%s\n", ax, ay, az, board::flipped(),

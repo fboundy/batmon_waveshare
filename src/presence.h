@@ -25,6 +25,7 @@ struct Phone {
     uint8_t  irk[16];
     bool     hasIrk;
     uint32_t lastSeenMs;    // 0 = never
+    uint32_t firstSeenMs;   // first sighting of the current "return" (debounce)
     int8_t   rssi;
 };
 

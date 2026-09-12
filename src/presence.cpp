@@ -143,6 +143,7 @@ class ServerCb : public NimBLEServerCallbacks {
         xSemaphoreTake(mtx, portMAX_DELAY);
         for (int i = 0; i < nPhones; i++)
             if (!strcasecmp(phones[i].addr, id.toString().c_str())) {
+                phones[i].firstSeenMs = 0;
                 if (!strcmp(phones[i].name, "Phone")) {
                     snprintf(phones[i].name, sizeof phones[i].name, "Phone %d", i + 1);
                     saveName(phones[i]);
@@ -251,8 +252,21 @@ void onAdvert(const NimBLEAddress& addr, int rssi) {
         if (isRpa) hit = phones[i].hasIrk && rpaMatches(val, phones[i].irk);
         else       hit = !strcasecmp(s.c_str(), phones[i].addr);   // controller already resolved it
         if (hit) {
-            phones[i].lastSeenMs = millis();
-            phones[i].rssi = (int8_t)rssi;
+            uint32_t now = millis();
+            Phone& p = phones[i];
+            p.rssi = (int8_t)rssi;
+            bool wasPresent = p.lastSeenMs != 0 && (now - p.lastSeenMs) < (uint32_t)g_settings.presenceTimeoutS * 1000UL;
+            if (wasPresent) {
+                p.lastSeenMs = now;
+            } else if (p.firstSeenMs && now - p.firstSeenMs < PRESENCE_CONFIRM_MS) {
+                // Second sighting within the window: it really is back.
+                p.lastSeenMs = now;
+                p.firstSeenMs = 0;
+            } else {
+                // One stray advert (idle iPhones send them sporadically)
+                // must not wake the display; wait for a second one.
+                p.firstSeenMs = now;
+            }
             break;
         }
     }

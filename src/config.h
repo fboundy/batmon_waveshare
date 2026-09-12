@@ -52,6 +52,7 @@
 #define PRESENCE_TIMEOUT_MIN_S    15      // range of the "away after" setting (default 90 s in settings.h)
 #define PRESENCE_TIMEOUT_MAX_S    600
 #define PRESENCE_MIN_RSSI         -95     // ignore weaker adverts
+#define PRESENCE_CONFIRM_MS       30000   // an absent phone must be seen twice within this to count as back
 #define PAIRING_WINDOW_MS         120000  // how long "Pair new phone" advertises
 #define BOOT_GRACE_MS             60000   // gate stays open after boot so the screen is reachable
 #define LEAVE_HOLD_MS             5000    // keep the BatMon link this long after the last phone leaves

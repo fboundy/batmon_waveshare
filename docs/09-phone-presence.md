@@ -4,8 +4,8 @@ Make the display follow its owner: pair one or more phones once, and from
 then on the screen and the BatMon link are only active while one of them is
 nearby. Optionally the BatMon relay follows the phone too.
 
-> **Status:** builds for both boards; **not yet run on hardware** (the 2.1
-> was off USB when it was written). First-run checklist at the bottom.
+> **Status:** verified on the 2.1 with an iPhone: pairing via LightBlue,
+> presence from advertisements, standby/wake, delete, rename.
 
 ## How it works
 
@@ -32,7 +32,16 @@ nearby. Optionally the BatMon relay follows the phone too.
    BLE client releases the BatMon (`LinkState::Standby`) and the main loop
    turns the backlight off. Any touch or BOOT press wakes the screen for
    `WAKE_MS` (30 s) without opening the gate.
-4. **Relay follows phone** (Setup switch / `relayphone 1`). On the first
+4. **Debounce.** A phone that has been away must be seen twice within
+   `PRESENCE_CONFIRM_MS` (30 s) before it counts as back; idle iPhones send
+   the odd advert even with Bluetooth toggled off in Control Centre, and one
+   packet must not wake the display. (A proper Bluetooth-off is Settings ->
+   Bluetooth, or Airplane mode.) The "away after" timeout is set on the
+   Phones page / `phone timeout <s>`.
+5. **Relay lock.** While phones are paired and none is present (screen
+   woken by touch/BOOT in standby) the relay toggles are greyed out and
+   ignored, so nobody without a paired phone can switch the relay.
+6. **Relay follows phone** (Phones page switch / `relayphone 1`). On the first
    phone arriving the relay-on command is queued and sent as soon as the
    BatMon is connected; on the last phone leaving, relay-off is sent
    immediately, inside the 5 s hold before the link is dropped.

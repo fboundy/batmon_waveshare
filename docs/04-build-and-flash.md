@@ -178,3 +178,11 @@ Quirks: when running via `python -m platformio` the automatic re-run after
 the core rebuild fails with `"None" is not recognized` - just run `pio run`
 again. The rebuilt libraries replace the stock ones inside
 `framework-arduinoespressif32-libs`; delete that package to go back.
+
+**Linker script:** the core rebuild also generates a `sections.ld` matching
+the new sdkconfig (it places the IRAM-safe LCD/GDMA functions) and leaves it
+in `.pio/build/<env>/`. The stock `framework-arduinoespressif32-libs/esp32s3/ld/sections.ld`
+is *not* updated, so a clean build of another env fails with
+`dangerous relocation: l32r: literal placed after use`. Fix: copy the generated
+file over the stock one (`ld/sections.ld`) once. Both envs share one
+rebuilt core, so `custom_sdkconfig` lives in the common section.
