@@ -37,6 +37,8 @@ const Phone& phone(int i);
 bool         anyPaired();
 bool         present(int i);
 bool         anyPresent();
+// Index of the strongest present phone, or -1.
+int          nearestPresent();
 
 // True when the BatMon link and the screen should be active:
 // no phones paired, or a phone present, or still within the boot grace

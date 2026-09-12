@@ -53,6 +53,8 @@ struct Widgets {
     lv_obj_t* lblRelayState = nullptr;   // touch-less boards: "Relay ON"
     lv_obj_t* lblBt = nullptr;       // Bluetooth glyph, green/red
     lv_obj_t* lblCharge = nullptr;   // charge glyph, blue/green/yellow/red
+    lv_obj_t* lblPhoneIcon = nullptr;  // phone glyph, green when a paired phone is present
+    lv_obj_t* lblPhoneName = nullptr;  // name of the nearest present (or first paired) phone
     // Details
     lv_obj_t* detVal[D_COUNT] = {};
     lv_obj_t* swRelay = nullptr;
@@ -69,9 +71,17 @@ struct Widgets {
     lv_obj_t* lblWindow = nullptr;
     lv_obj_t* lblScale = nullptr;
     // Phones
-    lv_obj_t* lblPhones = nullptr;       // multi-line list
+    lv_obj_t* lblPhones = nullptr;       // multi-line list (touch-less layout)
+    lv_obj_t* phoneRows[8] = {};         // selectable rows (touch layout)
+    lv_obj_t* btnRename = nullptr;
+    lv_obj_t* btnDelete = nullptr;
     lv_obj_t* lblPairStatus = nullptr;
     lv_obj_t* btnPairLbl = nullptr;      // label inside the Pair button
+    // Name dialog (touch layout): shown after a pairing and for Rename
+    lv_obj_t* nameDlg = nullptr;
+    lv_obj_t* nameTitle = nullptr;
+    lv_obj_t* nameTa = nullptr;
+    lv_obj_t* nameKb = nullptr;
     // Setup
     lv_obj_t* swRelayPhone = nullptr;
     lv_obj_t* lblCapacity = nullptr;
@@ -108,6 +118,10 @@ void onForget(lv_event_t* e);
 void onPairPhone(lv_event_t* e);      // start / stop the pairing window
 void onForgetPhones(lv_event_t* e);
 void onRelayPhone(lv_event_t* e);
+void onPhoneRow(lv_event_t* e);       // user data: phone index; selects it
+void onRenamePhone(lv_event_t* e);    // opens the name dialog for the selection
+void onDeletePhone(lv_event_t* e);
+void onNameKeyboard(lv_event_t* e);   // LV_EVENT_READY / LV_EVENT_CANCEL from the keyboard
 
 // ---- layout entry points (one .cpp per form factor) -----------------------------
 namespace layout {

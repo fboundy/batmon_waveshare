@@ -188,6 +188,64 @@ void onRelayPhone(lv_event_t* e) {
     g_settings.save();
 }
 
+// ---- phone list selection / naming ----
+static int selectedPhone = -1;
+static int namingPhone = -1;
+static int lastPhoneCount = -1;
+
+static void applyPhoneSelection() {
+    for (int i = 0; i < 8; i++) {
+        if (!w.phoneRows[i]) continue;
+        lv_obj_set_style_border_width(w.phoneRows[i], i == selectedPhone ? 2 : 0, 0);
+        lv_obj_set_style_border_color(w.phoneRows[i], col::accent(), 0);
+    }
+    bool sel = selectedPhone >= 0 && selectedPhone < presence::count();
+    for (lv_obj_t* b : {w.btnRename, w.btnDelete}) {
+        if (!b) continue;
+        if (sel) lv_obj_clear_state(b, LV_STATE_DISABLED); else lv_obj_add_state(b, LV_STATE_DISABLED);
+    }
+}
+
+static void openNameDialog(int idx) {
+    if (!w.nameDlg || idx < 0 || idx >= presence::count()) return;
+    namingPhone = idx;
+    char buf[48];
+    snprintf(buf, sizeof buf, "Name for %s", presence::phone(idx).name);
+    if (w.nameTitle) lv_label_set_text(w.nameTitle, buf);
+    lv_textarea_set_text(w.nameTa, presence::phone(idx).name);
+    lv_obj_clear_flag(w.nameDlg, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(w.nameDlg);
+}
+
+void onPhoneRow(lv_event_t* e) {
+    selectedPhone = (int)(intptr_t)lv_event_get_user_data(e);
+    applyPhoneSelection();
+}
+
+void onRenamePhone(lv_event_t*) {
+    openNameDialog(selectedPhone);
+}
+
+void onDeletePhone(lv_event_t*) {
+    if (selectedPhone < 0) return;
+    presence::forget(selectedPhone);
+    selectedPhone = -1;
+    lastPhoneCount = presence::count();   // a deletion is not a new pairing
+    applyPhoneSelection();
+}
+
+void onNameKeyboard(lv_event_t* e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_READY && namingPhone >= 0) {
+        const char* t = lv_textarea_get_text(w.nameTa);
+        if (t && t[0]) presence::rename(namingPhone, t);
+    }
+    if (code == LV_EVENT_READY || code == LV_EVENT_CANCEL) {
+        namingPhone = -1;
+        lv_obj_add_flag(w.nameDlg, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Chart
 // ---------------------------------------------------------------------------
@@ -610,6 +668,29 @@ void update(const State& s) {
     if (chartVisible && millis() - lastChartMs >= CHART_REFRESH_MS) rebuildChart();
 
     // ---- Phones page ----
+    int nPhones = presence::count();
+    if (lastPhoneCount >= 0 && nPhones > lastPhoneCount) {
+        // A phone just paired: ask for its name (touch layouts only).
+        openNameDialog(nPhones - 1);
+    }
+    lastPhoneCount = nPhones;
+    if (w.phoneRows[0]) {
+        for (int i = 0; i < 8; i++) {
+            if (!w.phoneRows[i]) continue;
+            if (i < nPhones) {
+                const presence::Phone& p = presence::phone(i);
+                if (presence::present(i)) snprintf(buf, sizeof buf, "%s   %d dBm", p.name, p.rssi);
+                else snprintf(buf, sizeof buf, "%s   away", p.name);
+                lv_label_set_text(lv_obj_get_child(w.phoneRows[i], 0), buf);
+                lv_obj_set_style_text_color(lv_obj_get_child(w.phoneRows[i], 0),
+                                            presence::present(i) ? col::good() : col::dim(), 0);
+                lv_obj_clear_flag(w.phoneRows[i], LV_OBJ_FLAG_HIDDEN);
+            } else {
+                lv_obj_add_flag(w.phoneRows[i], LV_OBJ_FLAG_HIDDEN);
+            }
+        }
+        if (selectedPhone >= nPhones) { selectedPhone = -1; applyPhoneSelection(); }
+    }
     if (w.lblPhones) {
         char list[MAX_PHONE_LIST];
         int n = presence::count();
@@ -632,17 +713,33 @@ void update(const State& s) {
         lv_label_set_text(w.lblPhones, list);
     }
     if (w.lblPairStatus) {
-        if (presence::pairing()) {
+        if (nPhones == 0 && !presence::pairing()) {
+            snprintf(buf, sizeof buf, "No phones paired: the display works normally.");
+        } else if (presence::pairing()) {
             uint32_t left = presence::pairingRemainingMs() / 1000;
             snprintf(buf, sizeof buf, "Pairing: %lu:%02lu left. On the phone open nRF Connect,\n"
                      "connect to 'BatMon Display' and read the characteristic.",
                      (unsigned long)left / 60, (unsigned long)left % 60);
         } else {
-            snprintf(buf, sizeof buf, "%s", presence::anyPaired()
-                     ? "Screen and BatMon link stay off until a paired phone is near."
-                     : "Pair a phone to make the display follow it.");
+            snprintf(buf, sizeof buf, "Screen and BatMon link stay off until a paired phone is near.");
         }
         lv_label_set_text(w.lblPairStatus, buf);
+    }
+    // Phone icon on the Halo page: nearest present phone, else first paired
+    if (w.lblPhoneIcon) {
+        if (nPhones == 0) {
+            lv_obj_add_flag(w.lblPhoneIcon, LV_OBJ_FLAG_HIDDEN);
+            if (w.lblPhoneName) lv_obj_add_flag(w.lblPhoneName, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            int near = presence::nearestPresent();
+            lv_obj_clear_flag(w.lblPhoneIcon, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_text_color(w.lblPhoneIcon, near >= 0 ? col::good() : col::bad(), 0);
+            if (w.lblPhoneName) {
+                lv_obj_clear_flag(w.lblPhoneName, LV_OBJ_FLAG_HIDDEN);
+                lv_label_set_text(w.lblPhoneName, presence::phone(near >= 0 ? near : 0).name);
+                lv_obj_set_style_text_color(w.lblPhoneName, near >= 0 ? col::text() : col::dim(), 0);
+            }
+        }
     }
     setText(w.btnPairLbl, presence::pairing() ? "Stop pairing" : "Pair new phone");
 

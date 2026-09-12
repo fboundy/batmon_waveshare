@@ -202,6 +202,13 @@ bool anyPresent() {
     return false;
 }
 
+int nearestPresent() {
+    int best = -1;
+    for (int i = 0; i < nPhones; i++)
+        if (present(i) && (best < 0 || phones[i].rssi > phones[best].rssi)) best = i;
+    return best;
+}
+
 bool gateOpen() {
     if (nPhones == 0) return true;
     if (millis() - bootMs < BOOT_GRACE_MS) return true;

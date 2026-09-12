@@ -86,6 +86,16 @@ void halo(lv_obj_t* page) {
     lv_obj_align(w.lblRelayState, LV_ALIGN_TOP_RIGHT, -8, 126);
     lv_label_set_text(w.lblRelayState, "Relay --");
 
+    // Phone presence: glyph + name in the middle of the bottom row
+    lv_obj_t* rowPh = mkRow(page, 4);
+    lv_obj_set_flex_align(rowPh, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_align(rowPh, LV_ALIGN_TOP_MID, 10, 124);
+    w.lblPhoneIcon = mkLabel(rowPh, &lv_font_montserrat_16, col::bad());
+    lv_label_set_text(w.lblPhoneIcon, LV_SYMBOL_CALL);
+    lv_obj_add_flag(w.lblPhoneIcon, LV_OBJ_FLAG_HIDDEN);
+    w.lblPhoneName = mkLabel(rowPh, &lv_font_montserrat_12, col::dim());
+    lv_obj_add_flag(w.lblPhoneName, LV_OBJ_FLAG_HIDDEN);
+
 }
 
 // ---------------------------------------------------------------------------
