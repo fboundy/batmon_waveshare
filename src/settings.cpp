@@ -22,6 +22,8 @@ void Settings::load() {
     chartRange     = p.getUChar("crange", chartRange);
     relayFollowsPhone = p.getBool("relayph", relayFollowsPhone);
     presenceTimeoutS = p.getUShort("phto", presenceTimeoutS);
+    orientation    = p.getUChar("orient", orientation);
+    accelInvert    = p.getBool("accinv", accelInvert);
     p.end();
 }
 
@@ -38,6 +40,8 @@ void Settings::save() const {
     p.putUChar("crange", chartRange);
     p.putBool("relayph", relayFollowsPhone);
     p.putUShort("phto", presenceTimeoutS);
+    p.putUChar("orient", orientation);
+    p.putBool("accinv", accelInvert);
     p.end();
     board::displayResync();   // the NVS write may have upset the RGB panel
 }

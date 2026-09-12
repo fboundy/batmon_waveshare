@@ -34,6 +34,7 @@ static void help() {
         "  save                   flush history to flash now\n"
         "  page                   next page\n"
         "  touchlog <0|1>         print raw touch coordinates (diagnostics)\n"
+        "  orient auto|normal|flipped|invert   display orientation (auto = accelerometer)\n"
         "  phone list             paired phones and presence\n"
         "  phone pair             open a 2 min pairing window (advertises 'BatMon Display')\n"
         "  phone forget <n|all>\n"
@@ -62,6 +63,11 @@ static void status() {
                   (unsigned long)history::restoredSamples());
     Serial.printf("phones: %d paired, gate %s, relay follows phone %d\n", presence::count(),
                   presence::gateOpen() ? "open" : "closed (standby)", g_settings.relayFollowsPhone);
+    float ax, ay, az;
+    if (board::readAccel(ax, ay, az))
+        Serial.printf("accel: x %.2f y %.2f z %.2f g   flipped %d   orientation %s%s\n", ax, ay, az, board::flipped(),
+                      g_settings.orientation == 0 ? "auto" : (g_settings.orientation == 1 ? "normal" : "flipped"),
+                      g_settings.accelInvert ? " (inverted)" : "");
 }
 
 static void phoneList() {
@@ -195,6 +201,14 @@ static void execute(char* l) {
         g_settings.save();
         uiChanged();
         Serial.printf("relay follows phone: %d\n", on);
+    } else if (!strcasecmp(cmd, "orient") && a1) {
+        if (!strcasecmp(a1, "auto")) g_settings.orientation = 0;
+        else if (!strcasecmp(a1, "normal")) g_settings.orientation = 1;
+        else if (!strcasecmp(a1, "flipped")) g_settings.orientation = 2;
+        else if (!strcasecmp(a1, "invert")) g_settings.accelInvert = !g_settings.accelInvert;
+        else { Serial.println("usage: orient auto|normal|flipped|invert"); return; }
+        g_settings.save();
+        Serial.printf("orientation %u invert %d\n", g_settings.orientation, g_settings.accelInvert);
     } else if (!strcasecmp(cmd, "touchlog") && onOff(a1, on)) {
         board::setTouchLog(on);
         Serial.printf("touch logging %s\n", on ? "on" : "off");

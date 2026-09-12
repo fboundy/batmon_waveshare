@@ -33,6 +33,11 @@ public:
     // effect) or the timeout.  Returns false on timeout.
     bool waitVsync(uint32_t timeoutMs);
 
+    // Turn the picture 180 degrees inside the panel (ST7701 source
+    // direction register + MADCTL ML).  Can be called at any time.
+    void setFlip(bool flipped);
+    bool flipped() const { return flipped_; }
+
     // Restart the panel timing.  Flash writes stall PSRAM, which the panel
     // streams from, and can leave the picture scrambled/drifted; this
     // recovers it.  Call from a task after any flash write.
@@ -53,6 +58,8 @@ private:
 
     esp_lcd_panel_handle_t panel_ = nullptr;
     void* vsyncSem_ = nullptr;   // SemaphoreHandle_t
+    Tca9554* io_ = nullptr;
+    bool flipped_ = false;
     void* fb_[2] = {nullptr, nullptr};
     void* spi_ = nullptr;   // spi_device_handle_t
     uint8_t backlight_ = 0;

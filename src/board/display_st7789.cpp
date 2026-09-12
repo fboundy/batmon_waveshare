@@ -98,7 +98,7 @@ bool DisplaySt7789::begin(DoneCb done) {
     esp_lcd_panel_invert_color(panel_, true);        // this panel needs INVON
     // Landscape: MV + MX (MADCTL 0x60), or MV + MY when mounted the other way.
     esp_lcd_panel_swap_xy(panel_, true);
-    esp_lcd_panel_mirror(panel_, !LCD_ROTATE_180, LCD_ROTATE_180);
+    setFlip(LCD_ROTATE_180);
     esp_lcd_panel_set_gap(panel_, LCD_X_GAP, LCD_Y_GAP);
     esp_lcd_panel_disp_on_off(panel_, true);
     ESP_LOGI(TAG, "panel up, %dx%d", LCD_H_RES, LCD_V_RES);
@@ -111,6 +111,10 @@ bool DisplaySt7789::begin(DoneCb done) {
 void DisplaySt7789::flush(int x1, int y1, int x2, int y2, const void* px) {
     // esp_lcd_panel_draw_bitmap takes exclusive end coordinates.
     esp_lcd_panel_draw_bitmap(panel_, x1, y1, x2 + 1, y2 + 1, px);
+}
+
+void DisplaySt7789::setFlip(bool flipped) {
+    if (panel_) esp_lcd_panel_mirror(panel_, !flipped, flipped);
 }
 
 void DisplaySt7789::setBacklight(uint8_t percent) {

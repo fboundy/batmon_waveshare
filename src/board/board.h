@@ -16,6 +16,12 @@ LvglPort& lvgl();
 
 void setBacklight(uint8_t percent);
 
+// Orientation.  setFlipped() turns the picture (and touch) 180 degrees at
+// runtime; readAccel() gives gravity in g for the automatic mode.
+void setFlipped(bool flipped);
+bool flipped();
+bool readAccel(float& ax, float& ay, float& az);
+
 // Call after any flash write (NVS / LittleFS): RGB panels that stream from
 // PSRAM can lose sync while flash is busy.  No-op on other panels.
 void displayResync();

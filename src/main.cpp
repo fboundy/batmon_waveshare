@@ -6,6 +6,8 @@
 //   batmon_ble (core 0)  NimBLE central: scan / connect / poll the BatMon
 //   hist_save  (core 0)  writes the history buffers to LittleFS
 #include <Arduino.h>
+#include <math.h>
+
 
 #include "batmon/batmon_client.h"
 #include "board/board.h"
@@ -46,6 +48,28 @@ void loop() {
     lvgl.loop();
 
     presence::tick();
+
+    // Orientation: automatic from the accelerometer (which way gravity
+    // pulls along the board's vertical axis), re-checked every 2 s with a
+    // dead band so a slight tilt never flips it; or forced by the setting.
+    static uint32_t lastOrientMs = 0;
+    if (millis() - lastOrientMs >= 2000) {
+        lastOrientMs = millis();
+        if (g_settings.orientation == 1) board::setFlipped(false);
+        else if (g_settings.orientation == 2) board::setFlipped(true);
+        else {
+            float ax, ay, az;
+            if (board::readAccel(ax, ay, az)) {
+                // Use whichever in-plane axis carries most of gravity.
+                float g = fabsf(ax) > fabsf(ay) ? ax : ay;
+                if (fabsf(g) > 0.5f) {
+                    bool down = g < 0;
+                    if (g_settings.accelInvert) down = !down;
+                    board::setFlipped(down);
+                }
+            }
+        }
+    }
 
     // A history save just finished: flash writes stall PSRAM and can leave
     // the RGB panel scrambled, so restart its timing.

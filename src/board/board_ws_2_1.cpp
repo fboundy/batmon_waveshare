@@ -8,6 +8,7 @@
 #include "board.h"
 #include "button.h"
 #include "display_st7701.h"
+#include "qmi8658.h"
 #include "rtc.h"
 #include "tca9554.h"
 #include "touch_cst820.h"
@@ -18,6 +19,7 @@ static Tca9554  g_io(TCA9554_ADDR);
 static Display  g_display;
 static Touch    g_touch;
 static Rtc      g_rtc;
+static Qmi8658  g_imu;
 static LvglPort g_lvgl;
 static Button   g_button;
 
@@ -32,14 +34,14 @@ static void waitVsync() {
 static bool touchRead(uint16_t& x, uint16_t& y) {
     TouchPoint tp = g_touch.read();
     if (!tp.pressed) return false;
-#if LCD_ROTATE_180 && LCD_ROTATE_180_HW
-    // Panel is flipped in hardware; the touch panel is not.
-    x = LCD_H_RES - 1 - tp.x;
-    y = LCD_V_RES - 1 - tp.y;
-#else
-    x = tp.x;
-    y = tp.y;
-#endif
+    if (g_display.flipped()) {
+        // Panel is flipped in hardware; the touch panel is not.
+        x = LCD_H_RES - 1 - tp.x;
+        y = LCD_V_RES - 1 - tp.y;
+    } else {
+        x = tp.x;
+        y = tp.y;
+    }
     return true;
 }
 
@@ -55,6 +57,8 @@ bool init() {
     if (!ok) Serial.println("Display init failed!");
     g_touch.begin(g_io);
     g_rtc.begin();
+    g_imu.begin();
+    g_display.setFlip(LCD_ROTATE_180);   // until the orientation logic decides
     g_button.begin(PIN_BUTTON, BUTTON_LONG_MS);
 
     LvglConfig cfg;
@@ -64,7 +68,7 @@ bool init() {
     cfg.buf0 = g_display.frameBuffer(0);
     cfg.buf1 = g_display.frameBuffer(1);
     cfg.bufPixels = (size_t)LCD_H_RES * LCD_V_RES;
-    cfg.rotate180 = LCD_ROTATE_180 && !LCD_ROTATE_180_HW;   // software flip only if the panel doesn't
+    cfg.rotate180 = false;   // done in the panel, see Display::setFlip
     cfg.flush = flushFrame;
     cfg.waitVsync = waitVsync;
     cfg.touchRead = touchRead;
@@ -75,6 +79,9 @@ bool init() {
 LvglPort& lvgl() { return g_lvgl; }
 void setBacklight(uint8_t percent) { g_display.setBacklight(percent); }
 void displayResync() { g_display.resync(); }
+void setFlipped(bool f) { if (f != g_display.flipped()) g_display.setFlip(f); }
+bool flipped() { return g_display.flipped(); }
+bool readAccel(float& ax, float& ay, float& az) { return g_imu.read(ax, ay, az); }
 bool clock(uint32_t& secs) { return g_rtc.now(secs); }
 bool clockValid() { return !g_rtc.lostContinuity(); }
 void setStatusLed(uint8_t, uint8_t, uint8_t) {}

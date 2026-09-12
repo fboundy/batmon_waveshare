@@ -92,11 +92,7 @@ static const InitCmd kInit[] = {
     {0xEF, 1, {0x08}},
     // Back to Command1
     {0xFF, 5, {0x77, 0x01, 0x00, 0x00, 0x00}},
-#if LCD_ROTATE_180 && LCD_ROTATE_180_HW
-    {0x36, 1, {0xC0}},                            // MADCTL: MY|MX = 180 degree turn
-#else
-    {0x36, 1, {0x00}},                            // MADCTL
-#endif
+    {0x36, 1, {0x00}},                            // MADCTL (ML set later by setFlip)
     {0x3A, 1, {0x66}},                            // COLMOD: 18-bit RGB interface
     {0x11, 0, {}},                                // sleep out
     {0x00, 0xFF, {48}},                           // 480 ms
@@ -116,7 +112,26 @@ void Display::sendInitSequence() {
     }
 }
 
+// MX/MY in MADCTL do nothing for this panel in RGB mode; what works (as in
+// ESPHome's st7701s driver) is the source-direction register 0xC7 in
+// Command2 BK0 for the horizontal flip and MADCTL's ML bit for vertical.
+void Display::setFlip(bool flipped) {
+    flipped_ = flipped;
+    if (!spi_ || !io_) return;
+    io_->setOutput(EXIO_LCD_CS, false);
+    delay(1);
+    const uint8_t bk0[5] = {0x77, 0x01, 0x00, 0x00, 0x10};
+    const uint8_t bk_none[5] = {0x77, 0x01, 0x00, 0x00, 0x00};
+    spiCmd(0xFF); for (uint8_t v : bk0) spiData(v);
+    spiCmd(0xC7); spiData(flipped ? 0x04 : 0x00);     // SDIR
+    spiCmd(0xFF); for (uint8_t v : bk_none) spiData(v);
+    spiCmd(0x36); spiData(flipped ? 0x10 : 0x00);     // MADCTL ML
+    io_->setOutput(EXIO_LCD_CS, true);
+    delay(1);
+}
+
 bool Display::begin(Tca9554& io) {
+    io_ = &io;
     // --- hard reset via IO expander ---
     io.setOutput(EXIO_LCD_RST, false);
     delay(10);
