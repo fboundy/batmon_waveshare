@@ -321,7 +321,67 @@ void phones(lv_obj_t* page) {
 }
 
 // ---------------------------------------------------------------------------
-// Page 4: Setup
+// Page 4: OBD-II
+// ---------------------------------------------------------------------------
+void obd(lv_obj_t* page) {
+    lv_obj_t* title = mkLabel(page, &lv_font_montserrat_20, col::accent());
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 46);
+    lv_label_set_text(title, "OBD-II");
+
+    // Enable switch
+    lv_obj_t* el = mkLabel(page, &lv_font_montserrat_16, col::dim());
+    lv_label_set_text(el, "OBD adapter");
+    lv_obj_align(el, LV_ALIGN_TOP_MID, -46, 84);
+    w.swObd = lv_switch_create(page);
+    lv_obj_align(w.swObd, LV_ALIGN_TOP_MID, 72, 78);
+    if (g_settings.obdEnabled) lv_obj_add_state(w.swObd, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(w.swObd, onObdEnable, LV_EVENT_VALUE_CHANGED, nullptr);
+
+    w.lblObdStatus = mkLabel(page, &lv_font_montserrat_14, col::dim());
+    lv_obj_set_width(w.lblObdStatus, 330);
+    lv_obj_set_style_text_align(w.lblObdStatus, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(w.lblObdStatus, LV_LABEL_LONG_WRAP);
+    lv_obj_align(w.lblObdStatus, LV_ALIGN_TOP_MID, 0, 116);
+
+    // Candidate list: adapters heard by the scan; tap one to use it
+    w.obdList = lv_obj_create(page);
+    lv_obj_remove_style_all(w.obdList);
+    lv_obj_set_size(w.obdList, 320, 6 * 38);
+    lv_obj_align(w.obdList, LV_ALIGN_TOP_MID, 0, 156);
+    lv_obj_clear_flag(w.obdList, LV_OBJ_FLAG_SCROLLABLE);
+    for (int i = 0; i < 6; i++) {
+        lv_obj_t* b = mkButton(w.obdList, "", 320, 34, onObdRow, (void*)(intptr_t)i, &lv_font_montserrat_14);
+        lv_obj_set_pos(b, 0, i * 38);
+        lv_obj_set_style_radius(b, 6, 0);
+        lv_obj_add_flag(b, LV_OBJ_FLAG_HIDDEN);
+        w.obdRows[i] = b;
+    }
+
+    // Value grid: two columns like the Details page
+    w.obdGrid = lv_obj_create(page);
+    lv_obj_remove_style_all(w.obdGrid);
+    lv_obj_set_size(w.obdGrid, 300, O_COUNT * 20);
+    lv_obj_align(w.obdGrid, LV_ALIGN_TOP_MID, 0, 150);
+    lv_obj_clear_flag(w.obdGrid, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(w.obdGrid, LV_OBJ_FLAG_HIDDEN);
+    for (int i = 0; i < O_COUNT; i++) {
+        lv_obj_t* n = mkLabel(w.obdGrid, &lv_font_montserrat_14, col::dim());
+        lv_label_set_text(n, obdNames[i]);
+        lv_obj_set_pos(n, 0, i * 20);
+        w.obdVal[i] = mkLabel(w.obdGrid, &lv_font_montserrat_14, col::text());
+        lv_obj_set_width(w.obdVal[i], 190);
+        lv_obj_set_style_text_align(w.obdVal[i], LV_TEXT_ALIGN_RIGHT, 0);
+        lv_label_set_long_mode(w.obdVal[i], LV_LABEL_LONG_DOT);
+        lv_obj_set_pos(w.obdVal[i], 110, i * 20);
+    }
+
+    w.btnObdForget = mkButton(page, "Forget adapter", 200, 36, onObdForget, nullptr);
+    lv_obj_align(w.btnObdForget, LV_ALIGN_TOP_MID, 0, 396);
+    lv_obj_add_flag(w.btnObdForget, LV_OBJ_FLAG_HIDDEN);
+}
+
+// ---------------------------------------------------------------------------
+// Page 5: Setup
 // ---------------------------------------------------------------------------
 void setup(lv_obj_t* page) {
     lv_obj_t* title = mkLabel(page, &lv_font_montserrat_20, col::accent());

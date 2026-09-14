@@ -190,7 +190,28 @@ void phones(lv_obj_t* page) {
 }
 
 // ---------------------------------------------------------------------------
-// Page 4: Setup  (read-only summary; changes come from the serial console)
+// Page 4: OBD-II (text only; serial 'obd ...' commands to configure)
+// ---------------------------------------------------------------------------
+void obd(lv_obj_t* page) {
+    lv_obj_t* title = mkLabel(page, &lv_font_montserrat_14, col::accent());
+    lv_obj_set_pos(title, 8, 2);
+    lv_label_set_text(title, "OBD-II");
+
+    w.lblObdStatus = mkLabel(page, &lv_font_montserrat_12, col::dim());
+    lv_obj_align(w.lblObdStatus, LV_ALIGN_TOP_RIGHT, -8, 4);
+
+    w.lblObdInfo = mkLabel(page, &lv_font_montserrat_12, col::text());
+    lv_obj_set_width(w.lblObdInfo, LCD_H_RES - 16);
+    lv_label_set_long_mode(w.lblObdInfo, LV_LABEL_LONG_WRAP);
+    lv_obj_set_pos(w.lblObdInfo, 8, 22);
+
+    lv_obj_t* help = mkLabel(page, &lv_font_montserrat_12, col::stale());
+    lv_label_set_text(help, "serial: obd on|list|connect <n>|forget|send <cmd>");
+    lv_obj_align(help, LV_ALIGN_BOTTOM_LEFT, 8, -4);
+}
+
+// ---------------------------------------------------------------------------
+// Page 5: Setup  (read-only summary; changes come from the serial console)
 // ---------------------------------------------------------------------------
 void setup(lv_obj_t* page) {
     lv_obj_t* title = mkLabel(page, &lv_font_montserrat_14, col::accent());

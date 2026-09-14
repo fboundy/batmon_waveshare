@@ -8,7 +8,7 @@
 // Firmware identity
 // ---------------------------------------------------------------------------
 #define FW_NAME     "batmon-display"
-#define FW_VERSION  "0.5.0"
+#define FW_VERSION  "0.6.0"
 
 // ---------------------------------------------------------------------------
 // Board selection
@@ -57,6 +57,12 @@
 #define BOOT_GRACE_MS             60000   // gate stays open after boot so the screen is reachable
 #define LEAVE_HOLD_MS             5000    // keep the BatMon link this long after the last phone leaves
 #define WAKE_MS                   30000   // touch/button wakes the screen in standby for this long
+
+// OBD-II adapter (see src/obd/obd_client.h)
+#define OBD_POLL_MS               1000    // one round of supported PIDs per second
+#define OBD_REPLY_TIMEOUT_MS      2500    // wait for the ELM327 '>' prompt
+#define OBD_CONNECT_TIMEOUT_MS    8000
+#define OBD_RECONNECT_BACKOFF_MS  5000
 
 // Button timing
 #define BUTTON_LONG_MS            800

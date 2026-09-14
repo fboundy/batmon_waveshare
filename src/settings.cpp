@@ -24,6 +24,9 @@ void Settings::load() {
     presenceTimeoutS = p.getUShort("phto", presenceTimeoutS);
     orientation    = p.getUChar("orient", orientation);
     accelInvert    = p.getBool("accinv", accelInvert);
+    obdEnabled     = p.getBool("obden", obdEnabled);
+    p.getString("obdaddr", obdAddr, sizeof obdAddr);
+    obdAddrType    = p.getUChar("obdaddrt", obdAddrType);
     p.end();
 }
 
@@ -42,6 +45,9 @@ void Settings::save() const {
     p.putUShort("phto", presenceTimeoutS);
     p.putUChar("orient", orientation);
     p.putBool("accinv", accelInvert);
+    p.putBool("obden", obdEnabled);
+    p.putString("obdaddr", obdAddr);
+    p.putUChar("obdaddrt", obdAddrType);
     p.end();
     board::displayResync();   // the NVS write may have upset the RGB panel
 }

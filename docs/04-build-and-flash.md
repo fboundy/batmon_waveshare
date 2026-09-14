@@ -91,6 +91,8 @@ All tunables are in `src/config.h`:
 | `BOOT_GRACE_MS` | 60000 | gate open after boot regardless of phones |
 | `LEAVE_HOLD_MS` | 5000 | BatMon link kept this long after the last phone leaves (relay-off goes out first) |
 | `WAKE_MS` | 30000 | touch/button wakes a standby screen for this long |
+| `OBD_POLL_MS` | 1000 | OBD-II poll round period |
+| `OBD_REPLY_TIMEOUT_MS` | 2500 | wait for the ELM327 `>` prompt |
 | `PAIRING_WINDOW_MS` | 120000 | how long "Pair new phone" advertises |
 | `CHG_AUX_CHARGING_V` | 13.2 | aux voltage above which a charger is considered running |
 | `CHG_MAIN_CURRENT_A` | 0.05 | main current above which the main is charging |
@@ -129,6 +131,7 @@ terminated). This is the only way to change settings on the touch-less
 | `phone list` / `phone pair` / `phone stop` / `phone forget <n\|all>` / `phone name <n> <name>` | phone presence, see [09-phone-presence.md](09-phone-presence.md) |
 | `relayphone 0\|1` | relay follows phone presence |
 | `beacon scan` / `beacon list` / `beacon add <n\|uuid> [major] [minor] [name]` | iBeacon tags as presence sources |
+| `obd status\|list\|connect <n>\|disconnect\|forget\|on\|off\|send <cmd>\|pids\|log <0\|1>` | OBD-II adapter, see [10-obd.md](10-obd.md) |
 | `help` | list |
 
 `pio device monitor` sends what you type when you press Enter.

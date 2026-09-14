@@ -12,6 +12,7 @@
 
 #include "../config.h"
 #include "../history.h"
+#include "../obd/obd_client.h"
 #include "../presence.h"
 #include "../settings.h"
 
@@ -40,6 +41,7 @@ const char* linkStateName(LinkState s) {
 void Client::begin() {
     mutex_ = xSemaphoreCreateMutex();
     candMutex_ = xSemaphoreCreateMutex();
+    radioMutex_ = xSemaphoreCreateRecursiveMutex();
     queue_ = xQueueCreate(8, sizeof(Cmd));
 
     NimBLEDevice::init("BatMon Display");
@@ -125,20 +127,42 @@ static bool isBatMon(const NimBLEAdvertisedDevice* d) {
 
 void Client::startScan() {
     if (scanning_) return;
+    // Someone else (an OBD connect attempt) owns the radio: they restart the
+    // scan when they are done, don't block a poll loop waiting for it.
+    if (xSemaphoreTakeRecursive((SemaphoreHandle_t)radioMutex_, 0) != pdTRUE) return;
     scanning_ = NimBLEDevice::getScan()->start(0, false, true);   // 0 = until stopped
     if (!scanning_) ESP_LOGW(TAG, "scan start failed");
+    xSemaphoreGiveRecursive((SemaphoreHandle_t)radioMutex_);
 }
 
 void Client::stopScan() {
-    if (!scanning_) return;
-    NimBLEDevice::getScan()->stop();
-    scanning_ = false;
+    xSemaphoreTakeRecursive((SemaphoreHandle_t)radioMutex_, portMAX_DELAY);
+    if (scanning_) {
+        NimBLEDevice::getScan()->stop();
+        scanning_ = false;
+    }
+    xSemaphoreGiveRecursive((SemaphoreHandle_t)radioMutex_);
+}
+
+bool Client::scanWanted() const {
+    return presence::anyPaired() || g_settings.obdEnabled;
+}
+
+void Client::radioAcquire() {
+    xSemaphoreTakeRecursive((SemaphoreHandle_t)radioMutex_, portMAX_DELAY);
+    stopScan();
+}
+
+void Client::radioRelease() {
+    if (scanWanted()) startScan();
+    xSemaphoreGiveRecursive((SemaphoreHandle_t)radioMutex_);
 }
 
 // NimBLE host task: every advertisement report.
 void Client::onResult(const NimBLEAdvertisedDevice* d) {
     std::string mfg = d->getManufacturerData();
     presence::onAdvert(d->getAddress(), d->getRSSI(), (const uint8_t*)mfg.data(), mfg.size());
+    if (g_settings.obdEnabled) obd::onAdvert(d);
 
     if (!isBatMon(d)) return;
     ESP_LOGD(TAG, "BatMon adv %s rssi=%d name='%s'", d->getAddress().toString().c_str(),
@@ -191,15 +215,16 @@ bool Client::connectTo(const NimBLEAddress& addr) {
         client_->setConnectionParams(12, 24, 0, 400);
     }
     linkDropped_ = false;
-    stopScan();   // the controller can't initiate a connection while scanning
+    radioAcquire();   // the controller can't initiate a connection while scanning
     bool ok = client_->connect(addr, true, false, true);
     if (!ok) ESP_LOGW(TAG, "connect() failed");
     if (ok && !findCharacteristics()) {
         client_->disconnect();
         ok = false;
     }
-    // Keep scanning while connected only if we need it for phone presence.
-    if (!ok || presence::anyPaired()) startScan();
+    // Keep scanning while connected only if presence / OBD discovery need it.
+    radioRelease();
+    if (!ok) startScan();
     return ok;
 }
 
@@ -475,7 +500,7 @@ void Client::task() {
         uint32_t consecutiveFail = 0;
         while (!linkDropped_ && !wantReconnect_ && presence::gateOpen()) {
             history::tick();
-            if (presence::anyPaired()) startScan();   // a phone may have been paired meanwhile
+            if (scanWanted()) startScan();   // a phone/OBD may have been enabled meanwhile
             uint32_t t0 = millis();
             bool ok = pollFast();
             if (ok && (lastSlowPollMs_ == 0 || millis() - lastSlowPollMs_ >= BLE_POLL_SLOW_MS)) {

@@ -11,6 +11,7 @@
 | [07-session-log.md](07-session-log.md) | What has been done, decided and verified so far; next steps (read this first when picking the project up) |
 | [08-hardware-lcd-1-9.md](08-hardware-lcd-1-9.md) | Second target: Waveshare ESP32-S3-LCD-1.9 (landscape, no touch) — pins, panel driving, button/serial input, first-run checklist |
 | [09-phone-presence.md](09-phone-presence.md) | Phone pairing / presence: bonding, RPA resolution, standby gate, relay-follow; pairing walkthrough and verification checklist |
+| [10-obd.md](10-obd.md) | OBD-II adapter (Veepeak OBDCheck BLE / any ELM327-over-BLE): GATT layouts, ELM327 session, PIDs, OBD page, console diagnosis |
 
 ## Sources
 
@@ -19,3 +20,4 @@
 * Waveshare wiki — https://www.waveshare.com/wiki/ESP32-S3-LCD-1.9 (second board, demo code)
 * BatMon 30A — https://monitor-things.com/products/batmon-30a
 * BatMon Halo — https://monitor-things.com/products/batmon-halo
+* Veepeak OBDCheck BLE — https://www.veepeak.com/product/obdcheck-ble/ (target OBD adapter)

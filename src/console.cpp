@@ -9,6 +9,7 @@
 #include "board/board.h"
 #include "config.h"
 #include "history.h"
+#include "obd/obd_client.h"
 #include "presence.h"
 #include "settings.h"
 #include "ui/ui.h"
@@ -45,7 +46,36 @@ static void help() {
         "  phone timeout <s>      away after this many seconds without an advert (15-600)\n"
         "  relayphone <0|1>       relay on when a phone arrives, off when the last leaves\n"
         "  beacon scan|list|add   iBeacon tags: listen 20 s, list what was heard, add one (phone forget/name apply)\n"
+        "  obd status|list|connect <n>|disconnect|forget|on|off   OBD-II adapter (ELM327 over BLE)\n"
+        "  obd send <cmd>         raw ELM327 command, e.g. 'obd send ATI' or 'obd send 010C'\n"
+        "  obd pids               supported PIDs from the ECU\n"
+        "  obd log <0|1>          echo every OBD command/reply\n"
         "  help");
+}
+
+static void obdStatus() {
+    obd::State o = obd::snapshot();
+    Serial.printf("obd: %s  enabled %d  adapter '%s' %s  rssi %d  ok/err %lu/%lu  log %d\n", obd::linkName(o.link),
+                  g_settings.obdEnabled, o.name, g_settings.obdAddr[0] ? g_settings.obdAddr : "(none)", o.rssi,
+                  (unsigned long)o.okCount, (unsigned long)o.errCount, obd::log());
+    if (o.link == obd::Link::Connected) {
+        Serial.printf("  elm '%s'  ecu %s  protocol '%s'\n", o.elmVersion, o.ecuResponding ? "responding" : "silent",
+                      o.protocol);
+        Serial.printf("  adapter %.1f V  module %.2f V  rpm %.0f  %.0f km/h  coolant %.0f C  intake %.0f C  ambient %.0f C\n",
+                      o.adapterVolts.v, o.voltage.v, o.rpm.v, o.speedKph.v, o.coolantC.v, o.intakeC.v, o.ambientC.v);
+        Serial.printf("  fuel %.0f %%  load %.0f %%  throttle %.0f %%  oil %.0f C  maf %.1f g/s  last: %s\n",
+                      o.fuelPct.v, o.loadPct.v, o.throttlePct.v, o.oilC.v, o.mafGs.v, o.lastRaw);
+    }
+}
+
+static void obdList() {
+    int n = obd::candidateCount();
+    Serial.printf("%d OBD adapter(s) seen%s\n", n, g_settings.obdEnabled ? "" : " (enable with 'obd on' to scan)");
+    for (int i = 0; i < n; i++) {
+        const obd::Candidate& c = obd::candidate(i);
+        Serial.printf("  %d: %-20s %s  %d dBm  %lus ago\n", i, c.name[0] ? c.name : "(no name)", c.addr, c.rssi,
+                      (unsigned long)((millis() - c.seenMs) / 1000));
+    }
 }
 
 static void status() {
@@ -245,6 +275,39 @@ static void execute(char* l) {
             else Serial.println("could not add (bad uuid / unknown candidate / list full)");
         } else {
             Serial.println("usage: beacon scan | beacon list | beacon add <n|uuid> [major] [minor] [name]");
+        }
+    } else if (!strcasecmp(cmd, "obd")) {
+        if (!a1 || !strcasecmp(a1, "status")) {
+            obdStatus();
+        } else if (!strcasecmp(a1, "list")) {
+            obdList();
+        } else if (!strcasecmp(a1, "connect") && a2) {
+            obd::connectTo(atoi(a2));
+            Serial.printf("connecting to candidate %d\n", atoi(a2));
+        } else if (!strcasecmp(a1, "disconnect")) {
+            obd::disconnect();
+        } else if (!strcasecmp(a1, "forget")) {
+            obd::forget();
+            Serial.println("adapter forgotten");
+        } else if (onOff(a1, on)) {
+            obd::setEnabled(on);
+            uiChanged();
+            Serial.printf("obd %s\n", on ? "enabled" : "disabled");
+        } else if (!strcasecmp(a1, "send") && a2) {
+            char* rest = strtok(nullptr, "");
+            char cmdline[48];
+            snprintf(cmdline, sizeof cmdline, "%s%s%s", a2, rest ? " " : "", rest ? rest : "");
+            obd::sendRaw(cmdline);
+        } else if (!strcasecmp(a1, "pids")) {
+            obd::State o = obd::snapshot();
+            char list[260];
+            int n = obd::supportedPids(o, list, sizeof list);
+            Serial.printf("ecu %s; %d supported PIDs: %s\n", o.ecuResponding ? "responding" : "silent", n, list);
+        } else if (!strcasecmp(a1, "log") && onOff(a2, on)) {
+            obd::setLog(on);
+            Serial.printf("obd log %d\n", on);
+        } else {
+            Serial.println("usage: obd status|list|connect <n>|disconnect|forget|on|off|send <cmd>|pids|log <0|1>");
         }
     } else if (!strcasecmp(cmd, "relayphone") && onOff(a1, on)) {
         g_settings.relayFollowsPhone = on;

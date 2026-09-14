@@ -10,6 +10,7 @@
 #include "../board/board.h"
 #include "../config.h"
 #include "../history.h"
+#include "../obd/obd_client.h"
 #include "../presence.h"
 #include "../settings.h"
 #include "ui_internal.h"
@@ -25,9 +26,12 @@ static constexpr size_t MAX_PHONE_LIST = 256;
 const char* const detailNames[D_COUNT] = {
     "Main voltage", "Aux voltage", "Current", "Power", "Amp hours", "Ah full ref",
     "Ah min", "Ext temp", "CPU temp", "RSSI", "Polls ok/err", "Address", "History saved"};
+const char* const obdNames[O_COUNT] = {
+    "Adapter", "ECU", "Battery", "Module V", "RPM", "Speed", "Coolant", "Intake",
+    "Ambient", "Fuel", "Load", "Throttle"};
 
 static lv_obj_t* tv = nullptr;
-static constexpr int NPAGES = 5;
+static constexpr int NPAGES = 6;
 static lv_obj_t* pages[NPAGES] = {};
 static constexpr int PAGE_CHART = 1;
 
@@ -297,6 +301,19 @@ void onBeaconRow(lv_event_t* e) {
     if (idx >= 0) openNameDialog(idx);
 }
 
+// ---- OBD page ----
+void onObdEnable(lv_event_t* e) {
+    obd::setEnabled(lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED));
+}
+
+void onObdRow(lv_event_t* e) {
+    obd::connectTo((int)(intptr_t)lv_event_get_user_data(e));
+}
+
+void onObdForget(lv_event_t*) {
+    obd::forget();
+}
+
 void onNameKeyboard(lv_event_t* e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_READY && namingPhone >= 0) {
@@ -503,6 +520,10 @@ void settingsChanged() {
         if (g_settings.relayFollowsPhone) lv_obj_add_state(w.swRelayPhone, LV_STATE_CHECKED);
         else lv_obj_clear_state(w.swRelayPhone, LV_STATE_CHECKED);
     }
+    if (w.swObd) {
+        if (g_settings.obdEnabled) lv_obj_add_state(w.swObd, LV_STATE_CHECKED);
+        else lv_obj_clear_state(w.swObd, LV_STATE_CHECKED);
+    }
     if (w.sliderBright) lv_slider_set_value(w.sliderBright, g_settings.brightness, LV_ANIM_OFF);
     if (w.swFahrenheit) {
         if (g_settings.fahrenheit) lv_obj_add_state(w.swFahrenheit, LV_STATE_CHECKED);
@@ -554,7 +575,8 @@ void create() {
     layout::chart(pages[1]);
     layout::detail(pages[2]);
     layout::phones(pages[3]);
-    layout::setup(pages[4]);
+    layout::obd(pages[4]);
+    layout::setup(pages[5]);
 
     applyRangeButtons();
     applySeriesButtons();
@@ -586,6 +608,96 @@ static void setHidden(lv_obj_t* o, bool hidden) {
     if (!o) return;
     if (hidden != lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN)) {
         if (hidden) lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); else lv_obj_clear_flag(o, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+static void updateObd() {
+    if (!w.lblObdStatus && !w.lblObdInfo) return;
+    char buf[160];
+    obd::State o = obd::snapshot();
+    bool enabled = g_settings.obdEnabled;
+    bool chosen = g_settings.obdAddr[0] != 0;
+    bool connected = o.link == obd::Link::Connected;
+    int nc = obd::candidateCount();
+
+    // Status line
+    if (!enabled) {
+        snprintf(buf, sizeof buf, "Off. Switch on to look for an ELM327 adapter.");
+    } else if (!chosen) {
+        snprintf(buf, sizeof buf, nc ? "Tap the adapter to use it (%d found):" : "Looking for adapters... plug the dongle in and turn the ignition on.", nc);
+    } else if (connected) {
+        snprintf(buf, sizeof buf, "%s   %d dBm   %s", o.name, o.rssi, o.ecuResponding ? "ECU responding" : "no ECU reply (ignition off?)");
+    } else {
+        snprintf(buf, sizeof buf, "%s: %s", o.name[0] ? o.name : "Adapter", obd::linkName(o.link));
+    }
+    setText(w.lblObdStatus, buf);
+    setColor(w.lblObdStatus, connected ? (o.ecuResponding ? col::good() : col::warn()) : col::dim());
+
+    // Candidate list vs. value grid
+    setHidden(w.obdList, !(enabled && !chosen));
+    setHidden(w.obdGrid, !chosen);
+    setHidden(w.btnObdForget, !chosen);
+    if (w.obdList && enabled && !chosen) {
+        for (int i = 0; i < 6; i++) {
+            if (!w.obdRows[i]) continue;
+            if (i < nc) {
+                const obd::Candidate& c = obd::candidate(i);
+                snprintf(buf, sizeof buf, "%s   %s   %d dBm", c.name[0] ? c.name : "(no name)", c.addr, c.rssi);
+                setText(lv_obj_get_child(w.obdRows[i], 0), buf);
+                setHidden(w.obdRows[i], false);
+            } else {
+                setHidden(w.obdRows[i], true);
+            }
+        }
+    }
+
+    auto val = [&](ObdRow r, const obd::Value& v, const char* f, bool temp = false) {
+        if (!w.obdVal[r]) return;
+        if (v.valid() && connected) snprintf(buf, sizeof buf, f, temp ? toDisplayTemp(v.v) : v.v, tempUnit());
+        else snprintf(buf, sizeof buf, "--");
+        setText(w.obdVal[r], buf);
+        setColor(w.obdVal[r], (v.valid() && connected && millis() - v.updatedMs < DATA_STALE_MS) ? col::text() : col::stale());
+    };
+    if (w.obdGrid && chosen) {
+        setText(w.obdVal[O_ADAPTER], connected && o.elmVersion[0] ? o.elmVersion : (connected ? "?" : obd::linkName(o.link)));
+        setColor(w.obdVal[O_ADAPTER], connected ? col::text() : col::dim());
+        if (connected) snprintf(buf, sizeof buf, "%s", o.ecuResponding ? (o.protocol[0] ? o.protocol : "responding") : "no reply");
+        else snprintf(buf, sizeof buf, "--");
+        setText(w.obdVal[O_ECU], buf);
+        setColor(w.obdVal[O_ECU], connected ? (o.ecuResponding ? col::good() : col::warn()) : col::dim());
+        val(O_ADAPTER_V, o.adapterVolts, "%.1f V");
+        val(O_MODULE_V, o.voltage, "%.2f V");
+        val(O_RPM, o.rpm, "%.0f");
+        val(O_SPEED, o.speedKph, "%.0f km/h");
+        val(O_COOLANT, o.coolantC, "%.0f %s", true);
+        val(O_INTAKE, o.intakeC, "%.0f %s", true);
+        val(O_AMBIENT, o.ambientC, "%.0f %s", true);
+        val(O_FUEL, o.fuelPct, "%.0f %%");
+        val(O_LOAD, o.loadPct, "%.0f %%");
+        val(O_THROTTLE, o.throttlePct, "%.0f %%");
+    }
+
+    // Touch-less layout: everything as text
+    if (w.lblObdInfo) {
+        char txt[320];
+        if (!enabled) {
+            snprintf(txt, sizeof txt, "OBD off. Serial: obd on, then obd list / obd connect <n>.");
+        } else if (!chosen) {
+            size_t used = snprintf(txt, sizeof txt, "%d adapter(s) seen:", nc);
+            for (int i = 0; i < nc && used < sizeof txt - 1; i++) {
+                const obd::Candidate& c = obd::candidate(i);
+                int wrote = snprintf(txt + used, sizeof txt - used, "\n%d: %s %s %d dBm", i, c.name[0] ? c.name : "?", c.addr, c.rssi);
+                if (wrote > 0) used += wrote;
+            }
+        } else if (!connected) {
+            snprintf(txt, sizeof txt, "%s: %s", o.name[0] ? o.name : "Adapter", obd::linkName(o.link));
+        } else {
+            snprintf(txt, sizeof txt, "%s  %s\nBatt %.1f V  Module %.2f V  RPM %.0f  %.0f km/h\nCoolant %.0f %s  Intake %.0f %s  Ambient %.0f %s\nFuel %.0f %%  Load %.0f %%  Throttle %.0f %%",
+                     o.elmVersion, o.ecuResponding ? o.protocol : "no ECU reply", o.adapterVolts.v, o.voltage.v, o.rpm.v,
+                     o.speedKph.v, toDisplayTemp(o.coolantC.v), tempUnit(), toDisplayTemp(o.intakeC.v), tempUnit(),
+                     toDisplayTemp(o.ambientC.v), tempUnit(), o.fuelPct.v, o.loadPct.v, o.throttlePct.v);
+        }
+        setText(w.lblObdInfo, txt);
     }
 }
 
@@ -866,6 +978,9 @@ void update(const State& s) {
         }
     }
     setText(w.btnPairLbl, presence::pairing() ? "Stop pairing" : "Pair new phone");
+
+    // ---- OBD page ----
+    updateObd();
 
     // ---- Setup page ----
     setText(w.btnPauseLbl, s.link == LinkState::Paused ? "Resume BLE" : "Pause BLE 5 min");

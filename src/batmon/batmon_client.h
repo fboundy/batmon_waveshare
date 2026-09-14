@@ -33,6 +33,13 @@ public:
     // Force a disconnect + rescan (e.g. after settings change).
     void reconnect();
 
+    // Radio arbitration for other BLE centrals (the OBD client): the
+    // controller cannot initiate a connection while scanning, so a connect
+    // attempt takes the radio (scan stopped, other connects wait) and gives
+    // it back afterwards (scan restarted if anyone still needs it).
+    void radioAcquire();
+    void radioRelease();
+
 private:
     struct Cmd {
         enum Kind : uint8_t { SetIo, Pause, Resume, Forget, Reconnect } kind;
@@ -44,9 +51,11 @@ private:
     static void taskEntry(void* arg);
     void task();
 
-    // One continuous scan feeds BatMon discovery and phone presence.
+    // One continuous scan feeds BatMon discovery, phone presence and OBD
+    // adapter discovery.  Both take radioMutex_ (startScan only tries).
     void startScan();
     void stopScan();
+    bool scanWanted() const;
     bool takeCandidate(NimBLEAddress& addr, std::string& name, int& rssi);
     bool connectTo(const NimBLEAddress& addr);
     void disconnect();
@@ -78,6 +87,7 @@ private:
     Candidate cand_;
     void* candMutex_ = nullptr;   // SemaphoreHandle_t
     bool scanning_ = false;
+    void* radioMutex_ = nullptr;   // recursive SemaphoreHandle_t
 
     NimBLEClient* client_ = nullptr;
     NimBLERemoteCharacteristic* chrSensor_ = nullptr;

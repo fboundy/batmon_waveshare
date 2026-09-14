@@ -196,3 +196,22 @@ continue on another machine. Newest entries at the bottom.
 - Bench lesson: opening the native-USB serial port resets the board (and
   restarts the 60 s boot grace); scripts now open with DTR/RTS deasserted.
 - Chart: volts 12-15 V, amps -30..+30 A axes.
+
+## 2026-09-14 - branch `feature/obd-ble` (v0.6.0)
+
+- OBD-II support started on its own branch: `src/obd/obd_client.*` is a
+  second NimBLE central (own task) that talks ELM327 over a BLE serial
+  characteristic pair, learns the supported PIDs and polls RPM / speed /
+  temperatures / fuel / load / throttle / module voltage / adapter voltage
+  once a second. New OBD-II page (round: enable switch, adapter picker,
+  value grid, Forget; wide: text) and `obd …` console commands, including
+  `obd send <raw>` and `obd log 1` for finding out what the dongle answers.
+  Docs in [10-obd.md](10-obd.md).
+- Radio arbitration between the two centrals: `radioAcquire/Release` on
+  the BatMon client (recursive mutex, scan stopped during a connect,
+  restarted when presence or OBD discovery still need it).
+  `CONFIG_BT_NIMBLE_MAX_CONNECTIONS=3`.
+- Both envs build (2.1: RAM 43.3 %, flash 20.0 %). **Untested on
+  hardware** - no adapter yet, and the 2.1 was not on USB at the end of the
+  session, so the build is not flashed either. First things to check are
+  in docs/10 "Diagnosis from the serial console".

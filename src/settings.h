@@ -25,6 +25,10 @@ struct Settings {
     uint8_t orientation = 0;
     // Swap the accelerometer's sense of "up" if auto gets it backwards.
     bool accelInvert = false;
+    // OBD-II adapter (ELM327 over BLE).  Empty addr = none chosen yet.
+    bool    obdEnabled = false;
+    char    obdAddr[18] = {0};
+    uint8_t obdAddrType = 0;
 
     void load();
     void save() const;

@@ -4,6 +4,7 @@
 //   loop()     (core 1)  LVGL rendering + input, pulls a state snapshot 4x/s,
 //                        BOOT button and serial console
 //   batmon_ble (core 0)  NimBLE central: scan / connect / poll the BatMon
+//   obd_ble    (core 0)  second central: ELM327 OBD-II adapter (optional)
 //   hist_save  (core 0)  writes the history buffers to LittleFS
 #include <Arduino.h>
 #include <math.h>
@@ -14,6 +15,7 @@
 #include "config.h"
 #include "console.h"
 #include "history.h"
+#include "obd/obd_client.h"
 #include "presence.h"
 #include "settings.h"
 #include "ui/ui.h"
@@ -39,6 +41,7 @@ void setup() {
     }
 
     batmon::g_client.begin();
+    obd::begin();
     console::begin();
     Serial.println("setup done; type 'help' for the console");
 }

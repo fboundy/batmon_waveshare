@@ -35,6 +35,13 @@ enum DetailRow {
 };
 extern const char* const detailNames[D_COUNT];
 
+// ---- OBD rows ---------------------------------------------------------------
+enum ObdRow {
+    O_ADAPTER, O_ECU, O_ADAPTER_V, O_MODULE_V, O_RPM, O_SPEED, O_COOLANT, O_INTAKE,
+    O_AMBIENT, O_FUEL, O_LOAD, O_THROTTLE, O_COUNT
+};
+extern const char* const obdNames[O_COUNT];
+
 // ---- widget handles -------------------------------------------------------------
 struct Widgets {
     // Halo
@@ -88,6 +95,15 @@ struct Widgets {
     lv_obj_t* nameTitle = nullptr;
     lv_obj_t* nameTa = nullptr;
     lv_obj_t* nameKb = nullptr;
+    // OBD
+    lv_obj_t* swObd = nullptr;           // enable switch
+    lv_obj_t* lblObdStatus = nullptr;    // link state line
+    lv_obj_t* obdList = nullptr;         // candidate list container (shown while no adapter chosen)
+    lv_obj_t* obdRows[6] = {};           // candidate rows; tap = connect
+    lv_obj_t* obdGrid = nullptr;         // value grid container (shown once an adapter is chosen)
+    lv_obj_t* obdVal[O_COUNT] = {};
+    lv_obj_t* btnObdForget = nullptr;
+    lv_obj_t* lblObdInfo = nullptr;      // touch-less: everything as text
     // Setup
     lv_obj_t* swRelayPhone = nullptr;
     lv_obj_t* lblCapacity = nullptr;
@@ -133,6 +149,9 @@ void onBeaconRow(lv_event_t* e);      // user data: candidate index
 void onBeaconCancel(lv_event_t* e);
 void onTimeout(lv_event_t* e);        // user data: delta seconds
 void setTimeoutLabel();
+void onObdEnable(lv_event_t* e);
+void onObdRow(lv_event_t* e);         // user data: candidate index; connects to it
+void onObdForget(lv_event_t* e);
 
 // ---- layout entry points (one .cpp per form factor) -----------------------------
 namespace layout {
@@ -140,6 +159,7 @@ void halo(lv_obj_t* page);
 void chart(lv_obj_t* page);
 void detail(lv_obj_t* page);
 void phones(lv_obj_t* page);
+void obd(lv_obj_t* page);
 void setup(lv_obj_t* page);
 }  // namespace layout
 
