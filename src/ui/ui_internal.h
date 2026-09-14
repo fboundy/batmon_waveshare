@@ -103,6 +103,11 @@ struct Widgets {
     lv_obj_t* obdGrid = nullptr;         // value grid container (shown once an adapter is chosen)
     lv_obj_t* obdVal[O_COUNT] = {};
     lv_obj_t* btnObdForget = nullptr;
+    // Diagnostics log overlay (touch layout)
+    lv_obj_t* obdLogDlg = nullptr;
+    lv_obj_t* obdLogBox = nullptr;       // scrollable container
+    lv_obj_t* lblObdLog = nullptr;       // the text
+    lv_obj_t* lblObdLogHint = nullptr;   // how to fetch it over BLE / advertising countdown
     lv_obj_t* lblObdInfo = nullptr;      // touch-less: everything as text
     // Setup
     lv_obj_t* swRelayPhone = nullptr;
@@ -152,6 +157,10 @@ void setTimeoutLabel();
 void onObdEnable(lv_event_t* e);
 void onObdRow(lv_event_t* e);         // user data: candidate index; connects to it
 void onObdForget(lv_event_t* e);
+void onObdLog(lv_event_t* e);         // open the diagnostics log overlay
+void onObdLogClose(lv_event_t* e);
+void onObdLogClear(lv_event_t* e);
+void onObdLogShare(lv_event_t* e);    // advertise so a phone can read the log over BLE
 
 // ---- layout entry points (one .cpp per form factor) -----------------------------
 namespace layout {

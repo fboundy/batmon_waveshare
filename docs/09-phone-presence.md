@@ -63,6 +63,10 @@ The phone keeps advertising while locked and in a pocket. If you *Forget*
 the display in the phone's Bluetooth settings, the phone gets a new IRK and
 must be paired again (`phone forget <n>` first).
 
+The same service also carries a plain-read characteristic `b47a0003-…`
+with the diagnostics log (see [10-obd.md](10-obd.md)); a phone that is
+already bonded and reconnects to read it is left connected.
+
 Up to 8 phones (`CONFIG_BT_NIMBLE_MAX_BONDS`). Names are kept in NVS
 namespace `phones`, keyed by identity address; the bonds themselves are
 NimBLE's.

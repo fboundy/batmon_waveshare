@@ -1,5 +1,7 @@
 #include "presence.h"
 
+#include "diag.h"
+
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <Preferences.h>
@@ -224,6 +226,17 @@ class ServerCb : public NimBLEServerCallbacks {
         }
         NimBLEAddress id = info.getIdAddress();
         ESP_LOGI(TAG, "bonded with %s", id.toString().c_str());
+        // A phone we already know just re-encrypted the link (it is probably
+        // here to read the diagnostics log): leave it connected.
+        bool known = false;
+        xSemaphoreTake(mtx, portMAX_DELAY);
+        for (int i = 0; i < nPhones; i++)
+            if (!strcasecmp(phones[i].addr, id.toString().c_str())) known = true;
+        xSemaphoreGive(mtx);
+        if (known) {
+            ESP_LOGI(TAG, "known phone, keeping the link");
+            return;
+        }
         reload();
         // It is obviously here right now.
         xSemaphoreTake(mtx, portMAX_DELAY);
@@ -263,6 +276,7 @@ void begin() {
     NimBLECharacteristic* chr =
         svc->createCharacteristic(CHR_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::READ_ENC);
     chr->setValue("paired");
+    diag::attach(svc);   // diagnostics log, readable by any phone
     svc->start();
     server->start();   // registers the services with the host; advertising asserts without it
 

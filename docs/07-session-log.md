@@ -215,3 +215,8 @@ continue on another machine. Newest entries at the bottom.
   hardware** - no adapter yet, and the 2.1 was not on USB at the end of the
   session, so the build is not flashed either. First things to check are
   in docs/10 "Diagnosis from the serial console".
+- Diagnostics log (`src/diag.*`): GATT table, ELM init replies, PID list
+  etc. kept in a 16 KB rolling buffer, saved to LittleFS, viewable on the
+  OBD page (Log), streamable to a phone over BLE (characteristic
+  `b47a0003` on the BatMon Display service; Share BLE button advertises),
+  and printable with `obd diag` - so a session in the van needs no PC.

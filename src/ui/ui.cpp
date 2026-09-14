@@ -9,6 +9,7 @@
 #include "../batmon/batmon_client.h"
 #include "../board/board.h"
 #include "../config.h"
+#include "../diag.h"
 #include "../history.h"
 #include "../obd/obd_client.h"
 #include "../presence.h"
@@ -312,6 +313,41 @@ void onObdRow(lv_event_t* e) {
 
 void onObdForget(lv_event_t*) {
     obd::forget();
+}
+
+static void fillObdLog() {
+    if (!w.lblObdLog) return;
+    size_t n = diag::size();
+    char* txt = (char*)malloc(n + 1);
+    if (!txt) return;
+    n = diag::read(0, txt, n);
+    txt[n] = 0;
+    lv_label_set_text(w.lblObdLog, n ? txt : "(empty - connect an adapter first)");
+    free(txt);
+    lv_obj_update_layout(w.obdLogBox);
+    lv_obj_scroll_to_y(w.obdLogBox, LV_COORD_MAX, LV_ANIM_OFF);
+}
+
+void onObdLog(lv_event_t*) {
+    if (!w.obdLogDlg) return;
+    fillObdLog();
+    lv_obj_clear_flag(w.obdLogDlg, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(w.obdLogDlg);
+}
+
+void onObdLogClose(lv_event_t*) {
+    if (w.obdLogDlg) lv_obj_add_flag(w.obdLogDlg, LV_OBJ_FLAG_HIDDEN);
+}
+
+void onObdLogClear(lv_event_t*) {
+    diag::clear();
+    fillObdLog();
+}
+
+void onObdLogShare(lv_event_t*) {
+    // Same advertising window as pairing; any phone can read the log
+    // characteristic without pairing.
+    presence::startPairing(PAIRING_WINDOW_MS);
 }
 
 void onNameKeyboard(lv_event_t* e) {
@@ -981,6 +1017,20 @@ void update(const State& s) {
 
     // ---- OBD page ----
     updateObd();
+    if (w.obdLogDlg && !lv_obj_has_flag(w.obdLogDlg, LV_OBJ_FLAG_HIDDEN)) {
+        static size_t shownBytes = 0;
+        if (diag::size() != shownBytes) { fillObdLog(); shownBytes = diag::size(); }
+        if (presence::pairing()) {
+            uint32_t left = presence::pairingRemainingMs() / 1000;
+            snprintf(buf, sizeof buf, "Advertising 'BatMon Display' for %lu:%02lu. In nRF Connect / LightBlue open "
+                     "characteristic b47a0003 and enable notifications (streams the log) or read it page by page.",
+                     (unsigned long)left / 60, (unsigned long)left % 60);
+        } else {
+            snprintf(buf, sizeof buf, "%u bytes saved in flash. Share BLE lets a phone fetch it; serial: obd diag.",
+                     (unsigned)diag::size());
+        }
+        setText(w.lblObdLogHint, buf);
+    }
 
     // ---- Setup page ----
     setText(w.btnPauseLbl, s.link == LinkState::Paused ? "Resume BLE" : "Pause BLE 5 min");

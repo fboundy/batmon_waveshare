@@ -42,6 +42,8 @@ Windows gotchas (both cost real time the first session):
 - `LCD_ROTATE_180` in `config.h`: software flip in `LvglPort::flushCb` + mirrored touch.
 - `src/obd/obd_client.*` (branch feature/obd-ble) — second BLE central for an ELM327 OBD-II dongle;
   shares the scan with the BatMon client via `radioAcquire/Release`. Docs in docs/10-obd.md.
+- `src/diag.*` — rolling diagnostics text log (LittleFS `/diag.txt`), shown on the OBD page and readable
+  over BLE (`b47a0003` on the pairing service) so adapter diagnosis needs no PC.
 - Page order: Halo, Chart, Details, Phones, OBD, Setup.
 - `src/config.h` — every pin and tunable.
 - `include/lv_conf.h` — LVGL config (fonts 14–48 enabled, demos off).

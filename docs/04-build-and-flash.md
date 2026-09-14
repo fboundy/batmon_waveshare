@@ -131,7 +131,7 @@ terminated). This is the only way to change settings on the touch-less
 | `phone list` / `phone pair` / `phone stop` / `phone forget <n\|all>` / `phone name <n> <name>` | phone presence, see [09-phone-presence.md](09-phone-presence.md) |
 | `relayphone 0\|1` | relay follows phone presence |
 | `beacon scan` / `beacon list` / `beacon add <n\|uuid> [major] [minor] [name]` | iBeacon tags as presence sources |
-| `obd status\|list\|connect <n>\|disconnect\|forget\|on\|off\|send <cmd>\|pids\|log <0\|1>` | OBD-II adapter, see [10-obd.md](10-obd.md) |
+| `obd status\|list\|connect <n>\|disconnect\|forget\|on\|off\|send <cmd>\|pids\|log <0\|1>\|diag [clear]` | OBD-II adapter, see [10-obd.md](10-obd.md) |
 | `help` | list |
 
 `pio device monitor` sends what you type when you press Enter.

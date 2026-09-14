@@ -14,6 +14,7 @@
 
 #include "../batmon/batmon_client.h"
 #include "../config.h"
+#include "../diag.h"
 #include "../presence.h"
 #include "../settings.h"
 
@@ -72,6 +73,7 @@ static NimBLERemoteCharacteristic* chrWrite_ = nullptr;
 static NimBLERemoteCharacteristic* chrNotify_ = nullptr;
 static volatile bool linkDropped_ = false;
 static bool wantReconnect_ = false;
+static bool logAll_ = false;   // diag-log every ELM transaction (init sequence, raw sends)
 
 // Receive buffer filled by notifications; a '>' prompt ends a reply.
 static char rx_[512];
@@ -171,6 +173,13 @@ void onAdvert(const NimBLEAdvertisedDevice* d) {
         cands[slot].addrType = d->getAddress().getType();
     }
     if (d->haveName()) strlcpy(cands[slot].name, d->getName().c_str(), sizeof cands[slot].name);
+    if (d->haveServiceUUID()) {
+        size_t o = 0;
+        cands[slot].services[0] = 0;
+        for (int i = 0; i < (int)d->getServiceUUIDCount() && o < sizeof cands[slot].services - 1; i++)
+            o += snprintf(cands[slot].services + o, sizeof cands[slot].services - o, "%s%s", i ? " " : "",
+                          d->getServiceUUID(i).toString().c_str());
+    }
     cands[slot].rssi = (int8_t)d->getRSSI();
     cands[slot].seenMs = millis();
     xSemaphoreGive(mtx);
@@ -182,7 +191,7 @@ void onAdvert(const NimBLEAdvertisedDevice* d) {
 class ClientCb : public NimBLEClientCallbacks {
     void onConnect(NimBLEClient*) override { ESP_LOGI(TAG, "connected"); }
     void onDisconnect(NimBLEClient*, int reason) override {
-        ESP_LOGW(TAG, "disconnected, reason=%d", reason);
+        diag::log("OBD disconnected, reason=%d", reason);
         linkDropped_ = true;
     }
 };
@@ -208,12 +217,12 @@ static bool findCharacteristics() {
     const std::vector<NimBLERemoteService*>& services = client_->getServices(true);
     NimBLERemoteCharacteristic* firstWrite = nullptr;
     NimBLERemoteCharacteristic* firstNotify = nullptr;
-    ESP_LOGI(TAG, "GATT table:");
+    diag::log("GATT table (%u services):", (unsigned)services.size());
     for (NimBLERemoteService* svc : services) {
-        ESP_LOGI(TAG, " service %s", svc->getUUID().toString().c_str());
+        diag::log(" service %s", svc->getUUID().toString().c_str());
         for (NimBLERemoteCharacteristic* ch : svc->getCharacteristics(true)) {
-            ESP_LOGI(TAG, "   chr %s r=%d w=%d wnr=%d n=%d i=%d", ch->getUUID().toString().c_str(), ch->canRead(),
-                     ch->canWrite(), ch->canWriteNoResponse(), ch->canNotify(), ch->canIndicate());
+            diag::log("   chr %s r=%d w=%d wnr=%d n=%d i=%d", ch->getUUID().toString().c_str(), ch->canRead(),
+                      ch->canWrite(), ch->canWriteNoResponse(), ch->canNotify(), ch->canIndicate());
             if (!firstWrite && (ch->canWrite() || ch->canWriteNoResponse())) firstWrite = ch;
             if (!firstNotify && ch->canNotify()) firstNotify = ch;
         }
@@ -228,22 +237,22 @@ static bool findCharacteristics() {
         if (w && n) {
             chrWrite_ = w;
             chrNotify_ = n;
-            ESP_LOGI(TAG, "using layout: %s", l.name);
+            diag::log("using layout: %s", l.name);
             break;
         }
     }
     if (!chrWrite_ || !chrNotify_) {
         chrWrite_ = firstWrite;
         chrNotify_ = firstNotify;
-        if (chrWrite_ && chrNotify_) ESP_LOGW(TAG, "unknown layout; using first write %s + first notify %s",
-                                             chrWrite_->getUUID().toString().c_str(), chrNotify_->getUUID().toString().c_str());
+        if (chrWrite_ && chrNotify_) diag::log("unknown layout; using first write %s + first notify %s",
+                                          chrWrite_->getUUID().toString().c_str(), chrNotify_->getUUID().toString().c_str());
     }
     if (!chrWrite_ || !chrNotify_) {
-        ESP_LOGE(TAG, "no usable write/notify characteristics");
+        diag::log("no usable write/notify characteristics");
         return false;
     }
     if (!chrNotify_->subscribe(true, onNotify)) {
-        ESP_LOGE(TAG, "subscribe failed");
+        diag::log("subscribe to %s failed", chrNotify_->getUUID().toString().c_str());
         return false;
     }
     return true;
@@ -259,7 +268,13 @@ static bool connectAdapter() {
     }
     linkDropped_ = false;
     NimBLEAddress addr(std::string(g_settings.obdAddr), g_settings.obdAddrType);
-    ESP_LOGI(TAG, "connecting to %s", g_settings.obdAddr);
+    {
+        const char* svcs = "";
+        for (int i = 0; i < nCands; i++)
+            if (!strcasecmp(cands[i].addr, g_settings.obdAddr)) svcs = cands[i].services;
+        diag::log("=== OBD connect %s '%s' type %u adv-services [%s]", g_settings.obdAddr, state_.name,
+                  g_settings.obdAddrType, svcs);
+    }
     batmon::g_client.radioAcquire();   // one connection attempt at a time, scan paused
     bool ok = client_->connect(addr, true, false, true);
     if (ok && !findCharacteristics()) {
@@ -267,7 +282,8 @@ static bool connectAdapter() {
         ok = false;
     }
     batmon::g_client.radioRelease();
-    if (!ok) ESP_LOGW(TAG, "connect failed");
+    if (!ok) diag::log("connect failed (mtu %u)", client_ ? client_->getMTU() : 0);
+    else diag::log("connected, mtu %u", client_->getMTU());
     return ok;
 }
 
@@ -316,6 +332,7 @@ static bool elm(const char* cmd, char* out, size_t outLen, uint32_t timeoutMs = 
     while (o && out[o - 1] == '|') o--;
     out[o] = 0;
     if (!got) ESP_LOGW(TAG, "timeout waiting for '>' after %s (got '%s')", cmd, out);
+    if (logAll_ || !got) diag::log("%s -> %s%s", cmd, out[0] ? out : "(empty)", got ? "" : " [no prompt]");
     xSemaphoreTake(mtx, portMAX_DELAY);
     strlcpy(state_.lastRaw, out, sizeof state_.lastRaw);
     xSemaphoreGive(mtx);
@@ -385,6 +402,7 @@ static bool readPidBitmap(uint8_t base, uint32_t& mask) {
 
 static bool initElm() {
     char r[96];
+    logAll_ = true;   // the init sequence is the interesting part; polls are not
     elm("ATZ", r, sizeof r, 3000);           // reset (some adapters answer slowly)
     vTaskDelay(pdMS_TO_TICKS(500));
     elm("ATE0", r, sizeof r);                // echo off
@@ -421,7 +439,8 @@ static bool initElm() {
     }
     char list[200];
     int n = supportedPids(state_, list, sizeof list);
-    ESP_LOGI(TAG, "ELM '%s' ecu=%d protocol '%s' pids(%d): %s", state_.elmVersion, ecu, state_.protocol, n, list);
+    diag::log("ELM '%s' ecu=%d protocol '%s' pids(%d): %s", state_.elmVersion, ecu, state_.protocol, n, list);
+    logAll_ = false;
     return true;
 }
 
@@ -521,7 +540,9 @@ static void handleCommands(uint32_t waitMs) {
                 break;
             case Cmd::Raw: {
                 char r[96];
+                logAll_ = true;
                 bool ok = elm(c.text, r, sizeof r, 4000);
+                logAll_ = false;
                 Serial.printf("obd: %s -> %s%s\n", c.text, r[0] ? r : "(empty)", ok ? "" : "  [no prompt]");
                 break;
             }

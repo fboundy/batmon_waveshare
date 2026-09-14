@@ -84,6 +84,31 @@ Round board: **OBD-II** page (page 5, before Setup).
 Standby (phone presence) applies: with the gate closed the OBD link is
 dropped like the BatMon link and comes back when a phone is present.
 
+## The diagnostics log (no PC needed)
+
+Everything worth knowing about a new adapter is written to a small text
+log (`src/diag.*`, 16 KB rolling, saved to LittleFS `/diag.txt` so it
+survives reboots): the advertised service UUIDs of the adapter, the full
+GATT table with properties, the layout chosen, MTU, every command and
+reply of the ELM327 init sequence, the supported-PID list, every `obd
+send` result, disconnect reasons. Three ways to get at it:
+
+1. **On screen** — OBD-II page → **Log**. Scrollable; the overlay refreshes
+   as lines arrive. **Clear** empties it.
+2. **Over BLE from a phone** — in the Log overlay press **Share BLE** (or
+   Phones → Pair phone, or serial `phone pair`): the display advertises as
+   *BatMon Display* for 2 minutes. In nRF Connect / LightBlue connect to it
+   and open characteristic `b47a0003-9f21-4d9e-a1c3-5ab9d2f0c001`:
+   * **enable notifications** — the whole log is streamed in ~180-byte
+     chunks, ending with `--end--`; nRF Connect's log view can be exported
+     or copied, or
+   * **read** it repeatedly — each read returns the next 500-byte page,
+     an empty read means the end (and rewinds).
+   No pairing is needed for this characteristic. A phone that is already
+   bonded may re-encrypt the link on connect; the display now keeps such a
+   link up instead of dropping it 1.5 s after authentication.
+3. **Serial** — `obd diag` prints it, `obd diag clear` empties it.
+
 ## Diagnosis from the serial console
 
 | Command | Effect |
@@ -96,6 +121,7 @@ dropped like the BatMon link and comes back when a phone is present.
 | `obd send <cmd>` | raw ELM327 command; reply printed (`obd send ATI`, `obd send 0100`, `obd send 03` for DTCs) |
 | `obd pids` | decoded supported-PID list |
 | `obd log 1` | echo every command and every notification chunk |
+| `obd diag [clear]` | print / clear the saved diagnostics log |
 
 Suggested first session with a new adapter, engine running:
 
@@ -141,6 +167,7 @@ never blocks behind the other side's connect attempt.
 | File | Role |
 |---|---|
 | `src/obd/obd_client.{h,cpp}` | task, candidate list, layout table, ELM327 transactions, PID decoding |
+| `src/diag.{h,cpp}` | rolling diagnostics log in LittleFS; BLE characteristic `b47a0003` (read pages / notify stream) |
 | `src/batmon/batmon_client.*` | `radioAcquire/Release`, `scanWanted()`, feeds `obd::onAdvert()` |
 | `src/ui/ui.cpp`, `ui_layout_*.cpp` | OBD page |
 | `src/console.cpp` | `obd …` commands |

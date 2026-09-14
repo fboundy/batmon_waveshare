@@ -44,6 +44,7 @@ struct State {
 struct Candidate {
     char name[32];
     char addr[18];
+    char services[80];   // advertised service UUIDs (diagnostics)
     uint8_t addrType;
     int8_t rssi;
     uint32_t seenMs;

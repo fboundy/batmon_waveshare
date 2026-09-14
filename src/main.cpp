@@ -14,6 +14,7 @@
 #include "board/board.h"
 #include "config.h"
 #include "console.h"
+#include "diag.h"
 #include "history.h"
 #include "obd/obd_client.h"
 #include "presence.h"
@@ -34,6 +35,7 @@ void setup() {
 
     // Before the UI: the chart page reads history at build time.
     history::begin(board::clock, board::clockValid());
+    diag::begin();   // needs LittleFS (mounted by history)
 
     if (board::lvgl().lock()) {
         ui::create();

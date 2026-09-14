@@ -1,4 +1,5 @@
 #include "console.h"
+#include "diag.h"
 
 #include <Arduino.h>
 #include <ctype.h>
@@ -50,6 +51,7 @@ static void help() {
         "  obd send <cmd>         raw ELM327 command, e.g. 'obd send ATI' or 'obd send 010C'\n"
         "  obd pids               supported PIDs from the ECU\n"
         "  obd log <0|1>          echo every OBD command/reply\n"
+        "  obd diag [clear]       print (or clear) the saved diagnostics log (GATT table, ELM replies)\n"
         "  help");
 }
 
@@ -306,6 +308,21 @@ static void execute(char* l) {
         } else if (!strcasecmp(a1, "log") && onOff(a2, on)) {
             obd::setLog(on);
             Serial.printf("obd log %d\n", on);
+        } else if (!strcasecmp(a1, "diag")) {
+            if (a2 && !strcasecmp(a2, "clear")) {
+                diag::clear();
+                Serial.println("diag log cleared");
+            } else {
+                char chunk[257];
+                size_t pos = 0, n;
+                Serial.printf("--- diag log (%u bytes) ---\n", (unsigned)diag::size());
+                while ((n = diag::read(pos, chunk, sizeof chunk - 1)) > 0) {
+                    chunk[n] = 0;
+                    Serial.print(chunk);
+                    pos += n;
+                }
+                Serial.println("--- end ---");
+            }
         } else {
             Serial.println("usage: obd status|list|connect <n>|disconnect|forget|on|off|send <cmd>|pids|log <0|1>");
         }

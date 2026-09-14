@@ -375,9 +375,44 @@ void obd(lv_obj_t* page) {
         lv_obj_set_pos(w.obdVal[i], 110, i * 20);
     }
 
-    w.btnObdForget = mkButton(page, "Forget adapter", 200, 36, onObdForget, nullptr);
-    lv_obj_align(w.btnObdForget, LV_ALIGN_TOP_MID, 0, 396);
+    w.btnObdForget = mkButton(page, "Forget", 130, 36, onObdForget, nullptr);
+    lv_obj_align(w.btnObdForget, LV_ALIGN_TOP_MID, -72, 396);
     lv_obj_add_flag(w.btnObdForget, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_t* bl = mkButton(page, "Log", 130, 36, onObdLog, nullptr);
+    lv_obj_align(bl, LV_ALIGN_TOP_MID, 72, 396);
+
+    // Diagnostics log overlay: GATT table, ELM replies; fetchable over BLE
+    w.obdLogDlg = lv_obj_create(lv_scr_act());
+    lv_obj_remove_style_all(w.obdLogDlg);
+    lv_obj_set_size(w.obdLogDlg, LCD_H_RES, LCD_V_RES);
+    lv_obj_set_style_bg_color(w.obdLogDlg, col::bg(), 0);
+    lv_obj_set_style_bg_opa(w.obdLogDlg, LV_OPA_COVER, 0);
+    lv_obj_clear_flag(w.obdLogDlg, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(w.obdLogDlg, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_t* lt = mkLabel(w.obdLogDlg, &lv_font_montserrat_20, col::accent());
+    lv_label_set_text(lt, "OBD log");
+    lv_obj_align(lt, LV_ALIGN_TOP_MID, 0, 40);
+    w.obdLogBox = lv_obj_create(w.obdLogDlg);
+    lv_obj_remove_style_all(w.obdLogBox);
+    lv_obj_set_size(w.obdLogBox, 380, 270);
+    lv_obj_align(w.obdLogBox, LV_ALIGN_TOP_MID, 0, 72);
+    lv_obj_set_scroll_dir(w.obdLogBox, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(w.obdLogBox, LV_SCROLLBAR_MODE_AUTO);
+    w.lblObdLog = mkLabel(w.obdLogBox, &lv_font_montserrat_12, col::text());
+    lv_obj_set_width(w.lblObdLog, 370);
+    lv_label_set_long_mode(w.lblObdLog, LV_LABEL_LONG_WRAP);
+    lv_obj_set_pos(w.lblObdLog, 0, 0);
+    w.lblObdLogHint = mkLabel(w.obdLogDlg, &lv_font_montserrat_12, col::dim());
+    lv_obj_set_width(w.lblObdLogHint, 340);
+    lv_obj_set_style_text_align(w.lblObdLogHint, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(w.lblObdLogHint, LV_LABEL_LONG_WRAP);
+    lv_obj_align(w.lblObdLogHint, LV_ALIGN_TOP_MID, 0, 348);
+    lv_obj_t* bs = mkButton(w.obdLogDlg, "Share BLE", 110, 36, onObdLogShare, nullptr, &lv_font_montserrat_14);
+    lv_obj_align(bs, LV_ALIGN_BOTTOM_MID, -118, -50);
+    lv_obj_t* bc = mkButton(w.obdLogDlg, "Clear", 90, 36, onObdLogClear, nullptr, &lv_font_montserrat_14);
+    lv_obj_align(bc, LV_ALIGN_BOTTOM_MID, -4, -50);
+    lv_obj_t* bx = mkButton(w.obdLogDlg, "Close", 110, 36, onObdLogClose, nullptr, &lv_font_montserrat_14);
+    lv_obj_align(bx, LV_ALIGN_BOTTOM_MID, 110, -50);
 }
 
 // ---------------------------------------------------------------------------
